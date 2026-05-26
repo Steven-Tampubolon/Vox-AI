@@ -1,0 +1,25 @@
+.env
+
+# Build output
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Go build
+/bin/
+/dist/
+/build/
+
+# Nama binary spesifik project lo
+vox-ai
+vox-ai.exe
+
+# Go workspace
+go.work
+go.work.sum
+
+# IDE
+.vscode/
+.idea/
