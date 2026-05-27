@@ -1,4 +1,4 @@
-module vox-ai
+module github.com/Steven-Tampubolon/Vox-AI
 
 go 1.25.0
 

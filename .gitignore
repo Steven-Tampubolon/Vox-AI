@@ -13,8 +13,8 @@
 /build/
 
 # Nama binary spesifik project lo
-vox-ai
-vox-ai.exe
+Vox-AI
+Vox-AI.exe
 
 # Go workspace
 go.work

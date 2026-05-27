@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"vox-ai/internal/domain"
+	"github.com/Steven-Tampubolon/Vox-AI/internal/domain"
 
 	_ "modernc.org/sqlite"
 )

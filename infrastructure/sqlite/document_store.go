@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"vox-ai/internal/domain"
+	"github.com/Steven-Tampubolon/Vox-AI/internal/domain"
 )
 
 type DocumentStore struct {
