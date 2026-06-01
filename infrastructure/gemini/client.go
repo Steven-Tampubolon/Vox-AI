@@ -71,13 +71,16 @@ func (c *Client) Generate(ctx context.Context, systemPrompt string, history []Co
 		return "", fmt.Errorf("marshal request: %w", err)
 	}
 
-	url := fmt.Sprintf("%s/%s:generateContent?key=%s", baseURL, model, c.apiKey)
+	url := fmt.Sprintf("%s/%s:generateContent", baseURL, model)
 
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(body))
 	if err != nil {
 		return "", fmt.Errorf("create request: %w", err)
 	}
+
+	// HEADER
 	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("x-goog-api-key", c.apiKey)
 
 	resp, err := c.httpClient.Do(httpReq)
 	if err != nil {
@@ -129,16 +132,16 @@ func (c *Client) Embed(ctx context.Context, text string) ([]float64, error) {
 		return nil, fmt.Errorf("marshal embed request: %w", err)
 	}
 
-	url := fmt.Sprintf(
-		"https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=%s",
-		c.apiKey,
-	)
+	url := "https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent"
 
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(body))
 	if err != nil {
 		return nil, fmt.Errorf("create embed request: %w", err)
 	}
+
+	// HEADER
 	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("x-goog-api-key", c.apiKey)
 
 	resp, err := c.httpClient.Do(httpReq)
 	if err != nil {
