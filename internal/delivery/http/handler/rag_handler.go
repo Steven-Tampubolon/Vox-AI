@@ -143,8 +143,9 @@ func isAllowedMimeType(file multipart.File) bool {
 	mimeType := http.DetectContentType(buffer[:n])
 
 	allowed := map[string]bool{
-		"text/plain; charset=utf-8": true,
-		"application/pdf":           true,
+		"text/plain; charset=utf-8":    true,
+		"application/pdf":              true,
+		"text/markdown; charset=utf-8": true,
 	}
 
 	return allowed[mimeType]
