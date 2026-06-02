@@ -1,8 +1,9 @@
 package handler
 
 import (
+	"bytes"
+	"fmt"
 	"io"
-	"mime/multipart"
 	"net/http"
 	"path/filepath"
 	"strings"
@@ -11,6 +12,7 @@ import (
 	"github.com/Steven-Tampubolon/Vox-AI/internal/usecase"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/ledongthuc/pdf"
 )
 
 type RAGHandler struct {
@@ -66,30 +68,46 @@ func (h *RAGHandler) UploadDocument(c *gin.Context) {
 	}
 	defer file.Close()
 
-	// Validasi ekstensi dan MIME type
-	filename := header.Filename
-	if !isAllowedFile(filename) {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "hanya file .txt, .md dan .pdf yang didukung saat ini",
-		})
-		return
-	}
-
-	if !isAllowedMimeType(file) {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "tipe file tidak valid",
-		})
-	}
-
-	// Baca isi file
-	content, err := io.ReadAll(file)
+	// Baca semua bytes SEKALI - dipakai untuk validasi dan ekstrak
+	rawBytes, err := io.ReadAll(file)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "gagal membaca file"})
 		return
 	}
 
-	if len(content) == 0 {
+	if len(rawBytes) == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "file kosong"})
+		return
+	}
+
+	// Validasi ekstensi + MIME dari bytes (bukan dari file pointer)
+	mimeType, valid := validateFile(rawBytes, header.Filename)
+	if !valid {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": fmt.Sprintf("file tidak valid, MIME terdeteksi: %s", mimeType),
+		})
+		return
+	}
+
+	// Ekstrak teks sesuai tipe file
+	var textContent string
+	if strings.HasPrefix(mimeType, "application/pdf") {
+		textContent, err = extractPDFText(rawBytes)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("gagal ekstrak teks dari PDF: %s", err.Error())})
+			return
+		}
+	} else {
+		// TXT - langsung konversi bytes ke string
+		textContent = string(rawBytes)
+	}
+
+	// Validasi hasil ekstrak tidak kosong
+	textContent = strings.TrimSpace(textContent)
+	if textContent == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "tidak ada teks yang bisa diekstrak. Pastikan PDF bukan hasil scan.",
+		})
 		return
 	}
 
@@ -97,8 +115,8 @@ func (h *RAGHandler) UploadDocument(c *gin.Context) {
 	doc, err := h.useCase.IndexDocument(
 		c.Request.Context(),
 		conversationID,
-		filename,
-		string(content),
+		header.Filename,
+		textContent,
 	)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -114,39 +132,69 @@ func (h *RAGHandler) UploadDocument(c *gin.Context) {
 	})
 }
 
-// isAllowedFile validasi ekstensi file yang diizinkan
-func isAllowedFile(filename string) bool {
-	allowed := map[string]bool{
-		".txt": true,
-		".md":  true,
-		".pdf": true,
+// --- Helper functions ---
+
+// validateFile validasi ekstensi dan MIME dari bytes yang sudah dibaca
+func validateFile(data []byte, filename string) (string, bool) {
+	// Cek ekstensi file
+	ext := strings.ToLower(filepath.Ext(filename))
+
+	allowed := map[string]string{
+		".txt": "text/plain",
+		".pdf": "application/pdf",
 	}
 
-	ext := strings.ToLower(filepath.Ext(filename))
-	return allowed[ext]
+	expectedMIME, ok := allowed[ext]
+	if !ok {
+		return "ekstensi tidak didukung", false
+	}
+
+	// Deteksi MIME dari actual bytes (max 512 bytes pertama)
+	limit := 512
+	if len(data) < limit {
+		limit = len(data)
+	}
+	detectedMIME := http.DetectContentType(data[:limit])
+
+	// Cek apakah MIME sesuai dengan ekpektasi
+	if !strings.HasPrefix(detectedMIME, expectedMIME) {
+		return detectedMIME, false
+	}
+
+	return detectedMIME, true
 }
 
-// isAllowedMimeType validasi MIME type yang dizinkan
-func isAllowedMimeType(file multipart.File) bool {
-	buffer := make([]byte, 512)
+// extractPDFText ekstrak teks dari PDF menggunakan ledongthuc/pdf
+func extractPDFText(data []byte) (string, error) {
+	reader := bytes.NewReader(data)
 
-	n, err := file.Read(buffer)
+	r, err := pdf.NewReader(reader, int64(len(data)))
 	if err != nil {
-		return false
+		return "", fmt.Errorf("gagal membuka PDF: %w", err)
 	}
 
-	_, err = file.Seek(0, io.SeekStart)
-	if err != nil {
-		return false
+	var result strings.Builder
+	numPages := r.NumPage()
+
+	if numPages == 0 {
+		return "", fmt.Errorf("PDF tidak memiliki halaman")
 	}
 
-	mimeType := http.DetectContentType(buffer[:n])
+	for i := 1; i <= numPages; i++ {
+		page := r.Page(i)
+		if page.V.IsNull() {
+			continue
+		}
 
-	allowed := map[string]bool{
-		"text/plain; charset=utf-8":    true,
-		"application/pdf":              true,
-		"text/markdown; charset=utf-8": true,
+		text, err := page.GetPlainText(nil)
+		if err != nil {
+			// Skip halaman gagal, lanjut halama berikutnya
+			continue
+		}
+
+		result.WriteString(text)
+		result.WriteString("\n\n")
 	}
 
-	return allowed[mimeType]
+	return result.String(), nil
 }
