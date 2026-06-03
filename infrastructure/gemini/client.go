@@ -11,7 +11,7 @@ import (
 
 const (
 	baseURL = "https://generativelanguage.googleapis.com/v1beta/models"
-	model   = "gemini-2.0-flash"
+	model   = "gemini-2.5-flash-lite"
 )
 
 type Client struct {
@@ -123,7 +123,7 @@ func (c *Client) Embed(ctx context.Context, text string) ([]float64, error) {
 	}
 
 	payload := EmbedRequest{
-		Model:   "models/text-embedding-004",
+		Model:   "models/gemini-embedding-001",
 		Content: Content{Parts: []Part{{Text: text}}},
 	}
 
@@ -132,7 +132,7 @@ func (c *Client) Embed(ctx context.Context, text string) ([]float64, error) {
 		return nil, fmt.Errorf("marshal embed request: %w", err)
 	}
 
-	url := "https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent"
+	url := "https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent"
 
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(body))
 	if err != nil {
