@@ -1,21 +1,4 @@
-Sudah saya pelajari seluruh codebase **Vox-AI**. Berikut hasilnya — README.md siap pakai + saran konkret untuk tim FE + checklist persiapan tim BE.
-
-Saya juga simpan README ke `/app/README.md` (tanpa di-push ke GitHub, sesuai permintaan).
-Action: file_editor create /app/README.md --file-text "# Vox-AI 🦊
-
-> **AI Chat Backend dengan 4 Karakter** — dibangun di Go (Gin) dengan **Clean Architecture**, didukung **Google Gemini 2.5 Flash Lite** untuk generasi teks dan **gemini-embedding-001** untuk RAG.
-
-<p align=\"center\">
-  <img src=\"https://img.shields.io/badge/Go-1.25-00ADD8?logo=go\" alt=\"Go\" />
-  <img src=\"https://img.shields.io/badge/Gin-1.12-blue\" alt=\"Gin\" />
-  <img src=\"https://img.shields.io/badge/SQLite-modernc-003B57?logo=sqlite\" alt=\"SQLite\" />
-  <img src=\"https://img.shields.io/badge/LLM-Gemini%202.5%20Flash%20Lite-orange\" alt=\"Gemini\" />
-  <img src=\"https://img.shields.io/badge/Architecture-Clean-success\" alt=\"Clean Architecture\" />
-</p>
-
----
-
-## ✨ Apa itu Vox-AI?
+## 🦊 Apa itu Vox-AI?
 
 Vox-AI adalah backend chat AI multi-karakter. Setiap karakter punya **kepribadian, system prompt, dan kemampuan** yang berbeda:
 
