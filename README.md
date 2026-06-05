@@ -1,4 +1,4 @@
-## 🦊 Apa itu Vox-AI?
+# 🦊 Apa itu Vox-AI?
 
 Vox-AI adalah backend chat AI multi-karakter. Setiap karakter punya **kepribadian, system prompt, dan kemampuan** yang berbeda:
 
