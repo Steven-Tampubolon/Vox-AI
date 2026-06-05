@@ -23,7 +23,7 @@ func NewRouter(
 	// ── Global middleware ──────────────────────────────────
 	router.Use(middleware.Logger())
 	router.Use(middleware.CORS(allowOrigin))
-	router.Use(middleware.RateLimiter(30, time.Minute))
+	router.Use(middleware.RateLimiter(5, time.Minute))
 	router.Use(gin.Recovery()) // tangkap panic agar server tidak crash
 
 	// ── Health check ───────────────────────────────────────

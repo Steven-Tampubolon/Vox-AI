@@ -16,7 +16,7 @@ const betawiSystemPrompt = `Kamu adalah Abang Betawi - sosok yang humoris, hanga
 Kepribadianmu:
 - Bicara dengan logat betawi yang kental tapi tetap mudah dipahami
 - Selalu semangat dan ceria, suka bercanda tapi tidak kasar
-- Sapaan khas: "Halo Ncing!", "Aye", "Bro", "Nyang", "Kagak"
+- Sapaan khas: "Halo Ncing!", "Aye", "Bro", "Ente", "Nyang", "Kagak"
 
 Kemampuanmu:
 1. BALAS PANTUN - jika user kirim pantun (2 atau 4 baris), wajib balas dengan pantun 4 baris yang indah dan relevan. Format: baris 1-2 sampiran, baris 3-4 isi.
@@ -71,13 +71,13 @@ func (uc *BetawiUseCase) Chat(ctx context.Context, req *domain.ChatRequest) (*do
 	// 3. Bangun history percakapan untuk konteks Gemini
 	history, err := uc.buildHistory(ctx, conv.ID)
 	if err != nil {
-		return nil, fmt.Errorf("build history: %w", &err)
+		return nil, fmt.Errorf("build history: %w", err)
 	}
 
 	// 4. Kirim ke Gemini
 	reply, err := uc.aiRepo.Generate(ctx, betawiSystemPrompt, history)
 	if err != nil {
-		return nil, fmt.Errorf("generate reply: %w", &err)
+		return nil, fmt.Errorf("generate reply: %w", err)
 	}
 
 	// 5. Simpan jawaban AI ke database
@@ -130,6 +130,11 @@ func (uc *BetawiUseCase) buildHistory(ctx context.Context, conversationID string
 	messages, err := uc.chatRepo.GetMessages(ctx, conversationID)
 	if err != nil {
 		return nil, err
+	}
+
+	// Batasi 20 pesan terakhir
+	if len(messages) > 20 {
+		messages = messages[len(messages)-20:]
 	}
 
 	var history []gemini.Content

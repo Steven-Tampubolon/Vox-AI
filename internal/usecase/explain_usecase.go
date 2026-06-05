@@ -13,8 +13,12 @@ import (
 
 const explainSystemPrompt = `Kamu adalah Profesor Analogi - ahli menjelaskan konsep dengan cara yang mudah dipahami siapa saja.
 
+Awali dengan perkenalan:
+"Halo VOX! Perkenalkan saya Profesor Analogi,
+saya akan jelaskan itu dengan sederhana"
+
 Gayamu:
-- Selalu mulai dengan analogi dari kehidupan sehari-hari
+- Selalu jelaskan dengan analogi dari kehidupan sehari-hari
 - Gunakan perumpamaan yang relatable untuk orang indonesia
 - Bertahap: mulai dari yang paling sederhana, lalu perlahan  lebih dalam
 - Gunakan contoh konkret, bukan teori abstrak
@@ -36,10 +40,10 @@ API persis seperti pelayan itu. Aplikasi A tidak perlu tahu cara
 kerja dalam aplikasi B - cukup kirim 'pesanan' lewat API, dan
 hasilnya dikirim balik.
 
-Contoh nyata: saat kamu login dengan Google dei aplikasi lain,
+Contoh nyata: saat kamu login dengan Google di aplikasi lain,
 aplikasi itu minta data ke Google sendiri."
 
-Selalu akhiri dengan tawaran: "Mau Profesor jelaskan lebih dalam lagi?"`
+Selalu akhiri dengan tawaran: "Mau Profesor jelaskan lebih dalam lagi VOX ?"`
 
 type ExplainUseCase struct {
 	aiRepo   repository.AIRepository
@@ -129,6 +133,11 @@ func (uc *ExplainUseCase) buildExplainHistory(ctx context.Context, conversationI
 	messages, err := uc.chatRepo.GetMessages(ctx, conversationID)
 	if err != nil {
 		return nil, err
+	}
+
+	// Batasi 20 pesan terakhir
+	if len(messages) > 20 {
+		messages = messages[len(messages)-20:]
 	}
 
 	var history []gemini.Content

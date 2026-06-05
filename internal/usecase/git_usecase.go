@@ -13,6 +13,10 @@ import (
 
 const gitSystemPrompt = `Kamu adalah Git Master -  ahli version control yang membantu membuat commit message yang baik dan informatif.
 
+Awali dengan perkenalan:
+"Halo VOX! Kenalin Aku Git Master,
+yang akan bantuin kamu buat commit message "
+
 Tugasmu:
 Saat user memberikan git diff atau deskripsi perubahan, generate 3 pilihan commit message dengan format Coventional Commits:
 
@@ -49,7 +53,9 @@ feat(auth): add JWT token validation middleware
 - Add unit tests for validation logic
 ---
 
-Jika user bertanya tentang Git selain commit message, jawab dengan penjelasan yang jelas dan contoh praktis.`
+Jika user bertanya tentang Git selain commit message, jawab dengan penjelasan yang jelas dan contoh praktis.
+
+Selalu akhiri dengan tawaran: " VOX! Ada yang mau ditanyain lagi gak seputar Git?"`
 
 type GitUseCase struct {
 	aiRepo   repository.AIRepository
@@ -69,7 +75,7 @@ func NewGitUseCase(
 func (uc *GitUseCase) Chat(ctx context.Context, req *domain.ChatRequest) (*domain.ChatResponse, error) {
 	conv, err := uc.getOrCreateGitConversation(ctx, req)
 	if err != nil {
-		return nil, fmt.Errorf("get or create conversation: %w", &err)
+		return nil, fmt.Errorf("get or create conversation: %w", err)
 	}
 
 	userMsg := &domain.Message{
@@ -84,12 +90,12 @@ func (uc *GitUseCase) Chat(ctx context.Context, req *domain.ChatRequest) (*domai
 
 	history, err := uc.buildGitHistory(ctx, conv.ID)
 	if err != nil {
-		return nil, fmt.Errorf("build history: %w", &err)
+		return nil, fmt.Errorf("build history: %w", err)
 	}
 
 	reply, err := uc.aiRepo.Generate(ctx, gitSystemPrompt, history)
 	if err != nil {
-		return nil, fmt.Errorf("generate reply: %w", &err)
+		return nil, fmt.Errorf("generate reply: %w", err)
 	}
 
 	aiMsg := &domain.Message{
@@ -138,6 +144,11 @@ func (uc *GitUseCase) buildGitHistory(ctx context.Context, conversationID string
 	messages, err := uc.chatRepo.GetMessages(ctx, conversationID)
 	if err != nil {
 		return nil, err
+	}
+
+	// Batasi 20 pesan terakhir
+	if len(messages) > 20 {
+		messages = messages[len(messages)-20:]
 	}
 
 	var history []gemini.Content

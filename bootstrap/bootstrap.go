@@ -2,9 +2,9 @@ package bootstrap
 
 import (
 	"database/sql"
-	"fmt"
 	"log"
 
+	"github.com/Steven-Tampubolon/Vox-AI/cli"
 	"github.com/Steven-Tampubolon/Vox-AI/config"
 	geminipkg "github.com/Steven-Tampubolon/Vox-AI/infrastructure/gemini"
 	"github.com/Steven-Tampubolon/Vox-AI/infrastructure/sqlite"
@@ -15,6 +15,8 @@ import (
 )
 
 func AppInit() {
+	cli.PrintBanner()
+
 	// 1.Load config dari .env
 	cfg := config.Load()
 	if cfg.GeminiAPIKey == "" {
@@ -30,10 +32,10 @@ func AppInit() {
 
 	// pastikan koneksi berhasil
 	if err := db.Ping(); err != nil {
-		log.Fatal("gagal ping satabase:", err)
+		log.Fatal("gagal ping database:", err)
 	}
 
-	// 3. Buata stores dan jalankan migrasi tabel
+	// 3. Buat stores dan jalankan migrasi tabel
 	chatStore := sqlite.NewChatStore(db)
 	if err := chatStore.Migrate(); err != nil {
 		log.Fatal("migrasi chat gagal:", err)
@@ -69,12 +71,11 @@ func AppInit() {
 		cfg.AllowOrigin,
 	)
 
-	// 8. Jalankan server
-	addr := fmt.Sprintf(":%s", cfg.Port)
-	log.Printf("[VoxAI] Server berjalan di http://localhost%s", addr)
-	log.Printf("[VoxAI] Health check: http://localhost%s/health", addr)
+	cli.PrintSystemInfo(cfg)
+	cli.PrintEndpoints(cfg.Port)
 
-	if err := router.Run(addr); err != nil {
+	// 8. Jalankan server
+	if err := router.Run(":" + cfg.Port); err != nil {
 		log.Fatal("server error:", err)
 	}
 

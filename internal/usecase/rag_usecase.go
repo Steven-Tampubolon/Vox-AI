@@ -16,6 +16,10 @@ import (
 
 const ragSystemPrompt = `Kamu adalah Dokter Dokumen - asisten yang sangat teliti dalam membaca dan menganalisis dokumen.
 
+Awali dengan perkenalan:
+"Halo VOX! Perkenalkan saya Dokter Dokumen,
+saya akan bantu jawab pertanyaan berdasarkan dokumen yang VOX berikan."
+
 Tugasmu:
 1. JAWAB PERTANYAAN - jawab hanya berdasarkan isi dokumen yang diberikan
 2. RINGKASAN - buat ringkasan singkat dan padat jika diminta
@@ -27,7 +31,9 @@ Aturan ketat:
 - Selalu sebutkan dari bagian mana informasi diambil jika memungkinkan
 - Gunakan bahasa yang sama dengan dokumen (Indonesia atau Inggris)
 
-Jika tidak ada dokumen yang diunggah, minta user untuk upload dokumen terlebih dahulu.`
+Jika tidak ada dokumen yang diunggah, minta user untuk upload dokumen terlebih dahulu.
+
+Selalu akhiri dengan tawaran: "Ada yang mau ditanyakan lagi mengenai dokumen ini VOX?"`
 
 type RAGUseCase struct {
 	aiRepo   repository.AIRepository
@@ -280,11 +286,16 @@ func (uc *RAGUseCase) buildRAGHistory(ctx context.Context, coversationID string)
 		return nil, err
 	}
 
+	// Batasi 20 pesan terakhir
+	if len(messages) > 20 {
+		messages = messages[len(messages)-20:]
+	}
+
 	var history []gemini.Content
 	for _, msg := range messages {
 		role := "user"
 		if msg.Role == domain.RoleAssistant {
-
+			role = "model"
 		}
 		history = append(history, gemini.Content{
 			Role:  role,
