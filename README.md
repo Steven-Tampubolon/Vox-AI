@@ -91,6 +91,7 @@ cd Vox-AI
 
 # 2. Salin .env.example → .env dan isi
 cp .env.example .env
+nano .env
 ```
 
 `.env`:
