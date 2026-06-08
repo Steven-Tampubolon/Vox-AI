@@ -28,7 +28,7 @@ func (h *ExplainHandler) Chat(c *gin.Context) {
 		return
 	}
 
-	req.Character = domain.CharacterExplaine
+	req.Character = domain.CharacterExplain
 
 	resp, err := h.useCase.Chat(c.Request.Context(), &req)
 	if err != nil {

@@ -23,7 +23,7 @@ func Load() *Config {
 		GeminiAPIKey: getEnv("GEMINI_API_KEY", ""),
 		Port:         getEnv("PORT", "8080"),
 		DBPath:       getEnv("DB_PATH", "./voxai.db"),
-		AllowOrigin:  getEnv("ALLOW_ORIGIN", "http://localhost:3000"),
+		AllowOrigin:  getEnv("ALLOW_ORIGINS", "http://localhost:3000"),
 	}
 }
 

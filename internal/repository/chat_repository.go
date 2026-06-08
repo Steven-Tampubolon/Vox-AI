@@ -14,6 +14,9 @@ type ChatRepository interface {
 	ListConversations(ctx context.Context) ([]*domain.Conversation, error)
 	SaveMessage(ctx context.Context, msg *domain.Message) error
 	GetMessages(ctx context.Context, conversationID string) ([]*domain.Message, error)
+	DeleteConversation(ctx context.Context, id string) error
+	UpdateConversationTitle(ctx context.Context, id, title string) error
+	ListConversationsByCharacter(ctx context.Context, character string) ([]*domain.Conversation, error)
 }
 
 // SQLiteChatRepository adalah implementasi ChatRepository menggunakan SQLite
@@ -44,4 +47,16 @@ func (r *SQLiteChatRepository) SaveMessage(ctx context.Context, msg *domain.Mess
 
 func (r *SQLiteChatRepository) GetMessages(ctx context.Context, conversationID string) ([]*domain.Message, error) {
 	return r.store.GetMessages(ctx, conversationID)
+}
+
+func (r *SQLiteChatRepository) DeleteConversation(ctx context.Context, id string) error {
+	return r.store.DeleteConversation(ctx, id)
+}
+
+func (r *SQLiteChatRepository) UpdateConversationTitle(ctx context.Context, id, title string) error {
+	return r.store.UpdateConversationTitle(ctx, id, title)
+}
+
+func (r *SQLiteChatRepository) ListConversationsByCharacter(ctx context.Context, character string) ([]*domain.Conversation, error) {
+	return r.store.ListConversationsByCharacter(ctx, character)
 }

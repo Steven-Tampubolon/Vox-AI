@@ -122,6 +122,12 @@ func (uc *GitUseCase) getOrCreateGitConversation(ctx context.Context, req *domai
 			return nil, err
 		}
 		if conv != nil {
+			// Validasi karakter - conversation harus milik karakter yang sama
+			if conv.Character != domain.CharacterGit {
+				return nil, fmt.Errorf(
+					"conversation ini milik karakter %s, bukan git", conv.Character,
+				)
+			}
 			return conv, nil
 		}
 	}

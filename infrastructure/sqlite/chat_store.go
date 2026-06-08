@@ -45,7 +45,7 @@ func (s *ChatStore) Migrate() error {
 // SaveConversation menyimpan sesi chat baru
 func (s *ChatStore) SaveConversation(ctx context.Context, conv *domain.Conversation) error {
 	query := `
-	INSERT INTO conversations (id, character, title, created_at, updated_at)
+	INSERT INTO conversations (id, ` + "`character`" + `, title, created_at, updated_at)
 	VALUES (?, ?, ?, ?, ?)`
 
 	_, err := s.db.ExecContext(ctx, query,
@@ -63,7 +63,7 @@ func (s *ChatStore) SaveConversation(ctx context.Context, conv *domain.Conversat
 
 // GetConversation mengambil satu sesi berdasarkan ID
 func (s *ChatStore) GetConversation(ctx context.Context, id string) (*domain.Conversation, error) {
-	query := `SELECT id, character, title, created_at, updated_at FROM conversations WHERE id = ?`
+	query := `SELECT id, ` + "`character`" + `, title, created_at, updated_at FROM conversations WHERE id = ?`
 
 	row := s.db.QueryRowContext(ctx, query, id)
 
@@ -83,7 +83,7 @@ func (s *ChatStore) GetConversation(ctx context.Context, id string) (*domain.Con
 
 // ListConversations mengambil semua sesi chat, terbaru di atas
 func (s *ChatStore) ListConversations(ctx context.Context) ([]*domain.Conversation, error) {
-	query := `SELECT id, character, title, created_at, updated_at 
+	query := `SELECT id, ` + "`character`" + `, title, created_at, updated_at 
 	          FROM conversations ORDER BY updated_at DESC`
 
 	rows, err := s.db.QueryContext(ctx, query)
@@ -155,5 +155,85 @@ func (s *ChatStore) GetMessages(ctx context.Context, conversationID string) ([]*
 		msg.Role = domain.Role(role)
 		result = append(result, &msg)
 	}
+	return result, nil
+}
+
+// DeleteConversation menghapus sesi chat beserta semua pesannya
+func (s *ChatStore) DeleteConversation(ctx context.Context, id string) error {
+	// Hapus messages dulu karena ada foreign key ke conversations
+	_, err := s.db.ExecContext(ctx,
+		`DELETE FROM messages WHERE conversation_id = ?`, id,
+	)
+	if err != nil {
+		return fmt.Errorf("delete messages: %w", err)
+	}
+
+	_, err = s.db.ExecContext(ctx,
+		`DELETE FROM conversations WHERE id = ?`, id,
+	)
+	if err != nil {
+		return fmt.Errorf("delete conversation: %w", err)
+	}
+
+	return nil
+}
+
+// UpdateConversationTitle mengubah judul sesi chat
+func (s *ChatStore) UpdateConversationTitle(ctx context.Context, id string, title string) error {
+	result, err := s.db.ExecContext(ctx,
+		`UPDATE conversations SET title = ?, updated_at = ? WHERE id = ?`,
+		title, time.Now(), id,
+	)
+	if err != nil {
+		return fmt.Errorf("updated title: %w", err)
+	}
+
+	// Cek apakah conversation ditemukan
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("rows effected: %w", err)
+	}
+	if rows == 0 {
+		return fmt.Errorf("conversation tidak ditemukan")
+	}
+
+	return nil
+}
+
+// ListConversationsByCharacter mengambil semua sesi, opsional filter perkarakter
+func (s *ChatStore) ListConversationsByCharacter(ctx context.Context, character string) ([]*domain.Conversation, error) {
+	var (
+		query string
+		args  []any
+	)
+
+	if character == "" {
+		// Tanpa filter — ambil semua
+		query = `SELECT id, ` + "`character`" + `, title, created_at, updated_at
+				 FROM conversations ORDER BY updated_at DESC`
+	} else {
+		query = `SELECT id, ` + "`character`" + `, title, created_at, updated_at
+				 FROM conversations WHERE ` + "`character`" + ` = ?
+				 ORDER BY updated_at DESC`
+		args = append(args, character)
+	}
+
+	rows, err := s.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("list conversations by character: %w", err)
+	}
+	defer rows.Close()
+
+	var result []*domain.Conversation
+	for rows.Next() {
+		var conv domain.Conversation
+		var char string
+		if err := rows.Scan(&conv.ID, &char, &conv.Title, &conv.CreatedAt, &conv.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("scan conversation: %w", err)
+		}
+		conv.Character = domain.Character(char)
+		result = append(result, &conv)
+	}
+
 	return result, nil
 }

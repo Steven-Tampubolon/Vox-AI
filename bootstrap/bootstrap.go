@@ -64,10 +64,12 @@ func AppInit() {
 	gitH := handler.NewGitHandler(gitUC)
 	explainH := handler.NewExplainHandler(explainUC)
 	convH := handler.NewConversationHandler(chatRepo)
+	characterH := handler.NewCharacterHandler()
 
 	// 7. Setup router
 	router := httpdelivery.NewRouter(
 		betawiH, ragH, gitH, explainH, convH,
+		characterH,
 		cfg.AllowOrigin,
 	)
 

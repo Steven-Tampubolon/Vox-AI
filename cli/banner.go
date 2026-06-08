@@ -100,10 +100,10 @@ func PrintEndpoints(port string) {
 
 	// // Characters
 	// dim.Println("  ── 4 Karakter AI ───────────────────────────────")
-	// PrintEndpoint(white, cyan, yellow, "POST", base+"/api/v1/chat/betawi", "Abang Betawi  — pantun & logat Betawi")
-	// PrintEndpoint(white, cyan, yellow, "POST", base+"/api/v1/chat/rag", "Dokter Dokumen — Q&A dari dokumen")
-	// PrintEndpoint(white, cyan, yellow, "POST", base+"/api/v1/chat/git", "Git Master     — commit message")
-	// PrintEndpoint(white, cyan, yellow, "POST", base+"/api/v1/chat/explain", "Profesor Analogi — jelaskan konsep")
+	// PrintEndpoint(white, cyan, yellow, "POST", base+"/api/v1/chat/betawi", 		"Abang Betawi  — pantun & logat Betawi")
+	// PrintEndpoint(white, cyan, yellow, "POST", base+"/api/v1/chat/rag", 			"Dokter Dokumen — Q&A dari dokumen")
+	// PrintEndpoint(white, cyan, yellow, "POST", base+"/api/v1/chat/git", 			"Git Master     — commit message")
+	// PrintEndpoint(white, cyan, yellow, "POST", base+"/api/v1/chat/explain", 		"Profesor Analogi — jelaskan konsep")
 	// fmt.Println()
 
 	// // Document
@@ -113,9 +113,16 @@ func PrintEndpoints(port string) {
 
 	// // Conversations
 	// dim.Println("  ── History ─────────────────────────────────────")
-	// PrintEndpoint(white, cyan, yellow, "GET ", base+"/api/v1/conversations", "List semua sesi chat")
-	// PrintEndpoint(white, cyan, yellow, "GET ", base+"/api/v1/conversations/:id/messages", "Pesan dalam satu sesi")
+	// 	PrintEndpoint(white, cyan, yellow, "GET		",  base+"/api/v1/conversations", 					"List semua sesi chat")
+	//	PrintEndpoint(white, cyan, yellow, "GET		", 	base+"/api/v1/conversations?character=betawi", 	"Filter sesi per karakter")
+	//  PrintEndpoint(white, cyan, yellow, "GET 	", 	base+"/api/v1/conversations/:id/messages", 		"Pesan dalam satu sesi")
+	//	PrintEndpoint(white, cyan, yellow, "DELETE	",	base+"/api/v1/conversations/:id", 				"Hapus sesi chat")
+	//	PrintEndpoint(white, cyan, yellow, "PATCH	", 	base+"/api/v1/conversations/:id", 				"Rename judul sesi")
 	// fmt.Println()
+
+	// ── Karakter ─────────────────────────────────────────
+	// dim.Println("  ── Karakter ────────────────────────────────────")
+	// PrintEndpoint(white, cyan, yellow, "GET		 ", base+"/api/v1/characters", "List 4 karakter")
 
 	green.Printf("  Server berjalan di %s\n", base)
 	dim.Println("  Tekan Ctrl+C untuk berhenti")

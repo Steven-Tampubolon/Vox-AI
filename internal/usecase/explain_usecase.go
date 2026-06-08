@@ -99,7 +99,7 @@ func (uc *ExplainUseCase) Chat(ctx context.Context, req *domain.ChatRequest) (*d
 
 	return &domain.ChatResponse{
 		ConversationID: conv.ID,
-		Character:      domain.CharacterExplaine,
+		Character:      domain.CharacterExplain,
 		Reply:          reply,
 	}, nil
 }
@@ -111,6 +111,12 @@ func (uc *ExplainUseCase) getOrCreateExplainConversation(ctx context.Context, re
 			return nil, err
 		}
 		if conv != nil {
+			// Validasi karakter - conversation harus milik karakter yang sama
+			if conv.Character != domain.CharacterExplain {
+				return nil, fmt.Errorf(
+					"conversation ini milik karakter %s, bukan explain", conv.Character,
+				)
+			}
 			return conv, nil
 		}
 	}
@@ -118,7 +124,7 @@ func (uc *ExplainUseCase) getOrCreateExplainConversation(ctx context.Context, re
 	now := time.Now()
 	conv := &domain.Conversation{
 		ID:        uuid.New().String(),
-		Character: domain.CharacterExplaine,
+		Character: domain.CharacterExplain,
 		Title:     truncate(req.Message, 40),
 		CreatedAt: now,
 		UpdatedAt: now,

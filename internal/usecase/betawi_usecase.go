@@ -106,6 +106,12 @@ func (uc *BetawiUseCase) getOrCreateConversation(ctx context.Context, req *domai
 			return nil, err
 		}
 		if conv != nil {
+			// Validasi karakter - conversation harus milik karakter yang sama
+			if conv.Character != domain.CharacterBetawi {
+				return nil, fmt.Errorf(
+					"conversation ini milik karakter %s, bukan betawi", conv.Character,
+				)
+			}
 			return conv, nil
 		}
 	}

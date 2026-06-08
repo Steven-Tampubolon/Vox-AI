@@ -262,6 +262,12 @@ func (uc *RAGUseCase) getOrCreateRAGConversation(ctx context.Context, req *domai
 			return nil, err
 		}
 		if conv != nil {
+			// Validasi karakter - conversation harus milik karakter yang sama
+			if conv.Character != domain.CharacterRAG {
+				return nil, fmt.Errorf(
+					"conversation ini milik karakter %s, bukan rag", conv.Character,
+				)
+			}
 			return conv, nil
 		}
 	}
