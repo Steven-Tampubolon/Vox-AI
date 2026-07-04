@@ -127,7 +127,7 @@ func (h *ConversationHandler) Delete(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "conversation berhasil dihapus",
-		"":        id,
+		"id":      id,
 	})
 }
 
