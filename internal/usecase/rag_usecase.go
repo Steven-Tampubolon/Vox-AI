@@ -55,7 +55,7 @@ func NewRAGUseCase(
 
 // IndexDocument proses dokumen: chunk > embed > simpan
 func (uc *RAGUseCase) IndexDocument(ctx context.Context, conversationID, filename, content string) (*domain.Document, error) {
-	//1. Buat atau pastikan conversation ada
+	// 1. Buat atau pastikan conversation ada
 	conv, err := uc.chatRepo.GetConversation(ctx, conversationID)
 	if err != nil {
 		return nil, err

@@ -2,6 +2,7 @@ package bootstrap
 
 import (
 	"database/sql"
+	"fmt"
 	"log"
 
 	"github.com/Steven-Tampubolon/Vox-AI/cli"
@@ -14,6 +15,21 @@ import (
 	"github.com/Steven-Tampubolon/Vox-AI/internal/usecase"
 )
 
+// Fungsi pembantu khusus untuk setup DB tanpa memicu issue exitAfterDefer
+func connectDB(dbPath string) (*sql.DB, error) {
+	db, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		return nil, fmt.Errorf("gagal buka database: %w", err)
+	}
+	// pastikan koneksi berhasil
+	if err := db.Ping(); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("gagal ping database: %w", err)
+	}
+
+	return db, nil
+}
+
 func AppInit() {
 	cli.PrintBanner()
 
@@ -24,25 +40,21 @@ func AppInit() {
 	}
 
 	// 2. Buka koneksi ke database
-	db, err := sql.Open("sqlite", cfg.DBPath)
+	db, err := connectDB(cfg.DBPath)
 	if err != nil {
-		log.Fatal("gagal  buka database:", err)
-	}
-	defer db.Close()
-
-	// pastikan koneksi berhasil
-	if err := db.Ping(); err != nil {
-		log.Fatal("gagal ping database:", err)
+		log.Fatal(err)
 	}
 
 	// 3. Buat stores dan jalankan migrasi tabel
 	chatStore := sqlite.NewChatStore(db)
 	if err := chatStore.Migrate(); err != nil {
+		db.Close()
 		log.Fatal("migrasi chat gagal:", err)
 	}
 
 	docStore := sqlite.NewDocumentStore(db)
 	if err := docStore.Migrate(); err != nil {
+		db.Close()
 		log.Fatal("migrasi document gagal:", err)
 	}
 
@@ -80,5 +92,6 @@ func AppInit() {
 	if err := router.Run(":" + cfg.Port); err != nil {
 		log.Fatal("server error:", err)
 	}
+	db.Close()
 
 }
