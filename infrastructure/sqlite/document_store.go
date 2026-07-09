@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log"
 
 	"github.com/Steven-Tampubolon/Vox-AI/internal/domain"
 )
@@ -85,7 +86,12 @@ func (s *DocumentStore) GetChunksByConversation(ctx context.Context, conversatio
 	if err != nil {
 		return nil, fmt.Errorf("get chunks: %w", err)
 	}
-	defer rows.Close()
+
+	defer func() {
+		if err := rows.Close(); err != nil {
+			log.Printf("gagal menutup rows: %v", err)
+		}
+	}()
 
 	var result []*domain.Chunk
 	for rows.Next() {

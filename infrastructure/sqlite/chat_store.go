@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/Steven-Tampubolon/Vox-AI/internal/domain"
@@ -90,7 +91,12 @@ func (s *ChatStore) ListConversations(ctx context.Context) ([]*domain.Conversati
 	if err != nil {
 		return nil, fmt.Errorf("list conversations: %w", err)
 	}
-	defer rows.Close()
+
+	defer func() {
+		if err := rows.Close(); err != nil {
+			log.Printf("gagal menutup rows: %v", err)
+		}
+	}()
 
 	var result []*domain.Conversation
 	for rows.Next() {
@@ -143,7 +149,12 @@ func (s *ChatStore) GetMessages(ctx context.Context, conversationID string) ([]*
 	if err != nil {
 		return nil, fmt.Errorf("get messages: %w", err)
 	}
-	defer rows.Close()
+
+	defer func() {
+		if err := rows.Close(); err != nil {
+			log.Printf("gagal menutup rows: %v", err)
+		}
+	}()
 
 	var result []*domain.Message
 	for rows.Next() {
@@ -222,7 +233,12 @@ func (s *ChatStore) ListConversationsByCharacter(ctx context.Context, character 
 	if err != nil {
 		return nil, fmt.Errorf("list conversations by character: %w", err)
 	}
-	defer rows.Close()
+
+	defer func() {
+		if err := rows.Close(); err != nil {
+			log.Printf("gagal menutup rows: %v", err)
+		}
+	}()
 
 	var result []*domain.Conversation
 	for rows.Next() {

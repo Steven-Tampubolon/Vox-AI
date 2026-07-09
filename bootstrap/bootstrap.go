@@ -15,6 +15,12 @@ import (
 	"github.com/Steven-Tampubolon/Vox-AI/internal/usecase"
 )
 
+func closeDB(db *sql.DB) {
+	if err := db.Close(); err != nil {
+		log.Printf("gagal menutup database: %v", err)
+	}
+}
+
 // Fungsi pembantu khusus untuk setup DB tanpa memicu issue exitAfterDefer
 func connectDB(dbPath string) (*sql.DB, error) {
 	db, err := sql.Open("sqlite", dbPath)
@@ -23,7 +29,7 @@ func connectDB(dbPath string) (*sql.DB, error) {
 	}
 	// pastikan koneksi berhasil
 	if err := db.Ping(); err != nil {
-		db.Close()
+		closeDB(db)
 		return nil, fmt.Errorf("gagal ping database: %w", err)
 	}
 
@@ -48,13 +54,13 @@ func AppInit() {
 	// 3. Buat stores dan jalankan migrasi tabel
 	chatStore := sqlite.NewChatStore(db)
 	if err := chatStore.Migrate(); err != nil {
-		db.Close()
+		closeDB(db)
 		log.Fatal("migrasi chat gagal:", err)
 	}
 
 	docStore := sqlite.NewDocumentStore(db)
 	if err := docStore.Migrate(); err != nil {
-		db.Close()
+		closeDB(db)
 		log.Fatal("migrasi document gagal:", err)
 	}
 
@@ -92,6 +98,6 @@ func AppInit() {
 	if err := router.Run(":" + cfg.Port); err != nil {
 		log.Fatal("server error:", err)
 	}
-	db.Close()
+	closeDB(db)
 
 }

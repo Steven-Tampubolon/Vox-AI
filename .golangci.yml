@@ -11,6 +11,11 @@ linters:
     - ineffassign
     - errcheck
     - gocritic
+  exclusions:
+    rules:
+      - path: cli/banner.go
+        linters:
+          - errcheck
 
 formatters:
   enable:

@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 )
@@ -86,7 +87,12 @@ func (c *Client) Generate(ctx context.Context, systemPrompt string, history []Co
 	if err != nil {
 		return "", fmt.Errorf("send request: %w", err)
 	}
-	defer resp.Body.Close()
+
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			log.Printf("gagal menutup response body: %v", err)
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("gemini API error: status %d", resp.StatusCode)
@@ -147,7 +153,12 @@ func (c *Client) Embed(ctx context.Context, text string) ([]float64, error) {
 	if err != nil {
 		return nil, fmt.Errorf("send embed request: %w", err)
 	}
-	defer resp.Body.Close()
+
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			log.Printf("gagal menutup response body: %v", err)
+		}
+	}()
 
 	var result EmbedResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {

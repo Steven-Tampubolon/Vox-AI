@@ -32,7 +32,6 @@ func (c Character) DisplayName() string {
 	return "Unknown"
 }
 
-
 // CharacterInfo adalah data lengkap karakter untuk response API
 type CharacterInfo struct {
 	ID          Character `json:"id"`

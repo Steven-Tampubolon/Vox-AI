@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"path/filepath"
 	"strings"
@@ -66,7 +67,11 @@ func (h *RAGHandler) UploadDocument(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "file tidak ditemukan dalam request"})
 		return
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			log.Printf("gagal menutup file upload: %v", err)
+		}
+	}()
 
 	// Baca semua bytes SEKALI - dipakai untuk validasi dan ekstrak
 	rawBytes, err := io.ReadAll(file)
