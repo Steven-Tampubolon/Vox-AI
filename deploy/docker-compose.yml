@@ -1,0 +1,31 @@
+# =========================================================
+# VOX AI - Jalankan tanpa clone repository
+# Cukup 2 file ini: docker-compose.yml + .env
+# Lalu jalankan: docker compose up -d
+# =========================================================
+services:
+  backend:
+    image: ghcr.io/steven-tampubolon/vox-ai:latest
+    container_name: voxai-backend
+    ports:
+      - "8080:8080"
+    environment:
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      PORT: 8080
+      DB_PATH: /app/data/voxai.db
+      ALLOW_ORIGINS: http://localhost:3000
+    volumes:
+      - voxai_data:/app/data
+    restart: unless-stopped
+
+  frontend:
+    image: ghcr.io/steven-tampubolon/vox-ai-frontend:latest
+    container_name: voxai-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  voxai_data:

@@ -1,5 +1,9 @@
 # 🦊 Apa itu Vox-AI?
 
+![Lint & Build](https://github.com/Steven-Tampubolon/vox-ai/actions/workflows/lint.yml/badge.svg)
+![Docker Publish](https://github.com/Steven-Tampubolon/vox-ai/actions/workflows/docker-publish.yml/badge.svg)
+![GHCR](https://img.shields.io/badge/ghcr.io-vox--ai-blue?logo=docker)
+
 Vox-AI adalah backend chat AI multi-karakter. Setiap karakter punya **kepribadian, system prompt, dan kemampuan** yang berbeda:
 
 | Karakter | Slug | Kemampuan |
@@ -69,13 +73,14 @@ Mengikuti **Clean Architecture / Onion** — dependencies hanya mengarah ke dala
 ├── infrastructure/
 │   ├── gemini/client.go           # Gemini API client (Generate + Embed)
 │   └── sqlite/                    # Persistence layer
+├── deploy/                        # docker-compose.yml untuk end-user (tanpa clone repo)
 ├── go.mod / go.sum
 └── .env.example
 ```
 
 ---
 
-## 🚀 Quickstart
+## 🚀 Quickstart (Development)
 
 ### Prasyarat
 
@@ -99,7 +104,7 @@ nano .env
 GEMINI_API_KEY=isi_dengan_api_key_anda
 PORT=8080
 DB_PATH=./voxai.db
-ALLOW_ORIGIN=http://localhost:3000
+ALLOW_ORIGINS=http://localhost:3000
 ```
 
 ```bash
@@ -112,6 +117,31 @@ Server jalan di `http://localhost:8080`. SQLite (`voxai.db`) dibuat otomatis pad
 
 ---
 
+## 🐳 Menjalankan via Docker (tanpa clone, untuk end-user)
+
+Image resmi di-publish otomatis ke GHCR setiap kali ada rilis versi (`vX.Y.Z`).
+
+**Opsi 1 — hanya backend:**
+```bash
+docker pull ghcr.io/steven-tampubolon/vox-ai:latest
+docker run -p 8080:8080 -e GEMINI_API_KEY=xxx ghcr.io/steven-tampubolon/vox-ai:latest
+```
+
+**Opsi 2 — backend + frontend sekaligus (direkomendasikan):**
+
+Download `docker-compose.yml` dan `.env.example` dari salah satu sumber ini (isinya sama, pilih yang paling nyaman):
+- Folder [`deploy/`](./deploy) di repo ini, atau
+- Halaman [**Releases**](https://github.com/Steven-Tampubolon/vox-ai/releases) — setiap tag versi otomatis melampirkan kedua file ini sebagai asset yang bisa langsung didownload tanpa clone.
+
+```bash
+cp .env.example .env   # isi GEMINI_API_KEY
+docker compose up -d
+```
+
+Buka `http://localhost:3000`. Detail lengkap ada di [`deploy/README.md`](./deploy/README.md).
+
+---
+
 ## 🌐 API Reference
 
 Base URL: `http://localhost:8080`
@@ -121,7 +151,7 @@ Base URL: `http://localhost:8080`
 ```http
 GET /health
 → 200 OK
-{ \"status\": \"ok\", \"service\": \"VoxAI\" }
+{ "status": "ok", "service": "VoxAI" }
 ```
 
 ### 💬 Chat dengan Karakter
@@ -133,17 +163,17 @@ POST /api/v1/chat/{betawi|rag|git|explain}
 Content-Type: application/json
 
 {
-  \"conversation_id\": \"\",                // kosong = buat sesi baru
-  \"message\": \"Buatkan pantun tentang ngoding\"
+  "conversation_id": "",                // kosong = buat sesi baru
+  "message": "Buatkan pantun tentang ngoding"
 }
 ```
 
 ```json
 // Response 200
 {
-  \"conversation_id\": \"0e3f8b6e-7f...\",
-  \"character\": \"betawi\",
-  \"reply\": \"Pagi-pagi minum kopi panas, …\"
+  "conversation_id": "0e3f8b6e-7f...",
+  "character": "betawi",
+  "reply": "Pagi-pagi minum kopi panas, …"
 }
 ```
 
@@ -162,11 +192,11 @@ conversation_id: <opsional, kosong = buat baru>
 ```json
 // Response 200
 {
-  \"conversation_id\": \"a8c...\",
-  \"document_id\":     \"1d2...\",
-  \"filename\":        \"skripsi.pdf\",
-  \"chunk_count\":     17,
-  \"message\":         \"dokumen berhasil diindeks, silahkan mulai bertanya\"
+  "conversation_id": "a8c...",
+  "document_id":     "1d2...",
+  "filename":        "skripsi.pdf",
+  "chunk_count":     17,
+  "message":         "dokumen berhasil diindeks, silahkan mulai bertanya"
 }
 ```
 
@@ -181,10 +211,10 @@ Setelah upload, lanjutkan ke `POST /api/v1/chat/rag` dengan `conversation_id` ya
 
 ```http
 GET /api/v1/conversations
-→ { \"conversations\": [ { \"id\", \"character\", \"title\", \"created_at\", \"updated_at\" } ] }
+→ { "conversations": [ { "id", "character", "title", "created_at", "updated_at" } ] }
 
 GET /api/v1/conversations/:id/messages
-→ { \"messages\": [ { \"id\", \"conversation_id\", \"role\", \"content\", \"created_at\" } ] }
+→ { "messages": [ { "id", "conversation_id", "role", "content", "created_at" } ] }
 ```
 
 Role di message: `user` | `assistant` | `system`.
@@ -198,12 +228,12 @@ Role di message: `user` | `assistant` | `system`.
 | `GEMINI_API_KEY` | — *(wajib)* | API key Google AI Studio |
 | `PORT` | `8080` | Port HTTP server |
 | `DB_PATH` | `./voxai.db` | Path file SQLite |
-| `ALLOW_ORIGIN` | `http://localhost:3000` | CORS origin yang diizinkan |
+| `ALLOW_ORIGINS` | `http://localhost:3000` | CORS origin yang diizinkan |
 
 ### Middleware Aktif
 
 - **Logger** — log request/response setiap hit
-- **CORS** — origin tunggal dari `ALLOW_ORIGIN`
+- **CORS** — origin tunggal dari `ALLOW_ORIGINS`
 - **Rate Limiter** — `5 request / menit / IP` (in-memory, sliding window)
 - **Recovery** — tangkap panic agar server tidak crash
 
@@ -217,16 +247,16 @@ curl http://localhost:8080/health
 
 # Chat Betawi
 curl -X POST http://localhost:8080/api/v1/chat/betawi \
-  -H \"Content-Type: application/json\" \
-  -d '{\"message\":\"Buatin pantun tentang kopi dong bang!\"}'
+  -H "Content-Type: application/json" \
+  -d '{"message":"Buatin pantun tentang kopi dong bang!"}'
 
 # Upload + RAG
 curl -X POST http://localhost:8080/api/v1/document/upload \
-  -F \"file=@skripsi.pdf\"
+  -F "file=@skripsi.pdf"
 # → ambil conversation_id, lalu:
 curl -X POST http://localhost:8080/api/v1/chat/rag \
-  -H \"Content-Type: application/json\" \
-  -d '{\"conversation_id\":\"<id>\",\"message\":\"Ringkas dokumen ini\"}'
+  -H "Content-Type: application/json" \
+  -d '{"conversation_id":"<id>","message":"Ringkas dokumen ini"}'
 ```
 
 ---
@@ -243,6 +273,21 @@ curl -X POST http://localhost:8080/api/v1/chat/rag \
 
 ---
 
+## 🔁 CI/CD
+
+| Workflow | Trigger | Fungsi |
+|---|---|---|
+| `lint.yml` | Setiap `push` / `pull_request` | golangci-lint + go vet + go build |
+| `docker-publish.yml` | Push tag `v*.*.*` | Build & push image ke `ghcr.io/steven-tampubolon/vox-ai`, lalu buat GitHub Release dan lampirkan `deploy/docker-compose.yml` + `deploy/.env.example` sebagai asset |
+
+Rilis versi baru:
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+---
+
 ## 👨‍💻 Author
 
 **Steven Tampubolon** — [@Steven-Tampubolon](https://github.com/Steven-Tampubolon)
@@ -252,4 +297,3 @@ curl -X POST http://localhost:8080/api/v1/chat/rag \
 ## 📜 Lisensi
 
 MIT — bebas dipakai, dimodifikasi, dan didistribusikan.
-"
