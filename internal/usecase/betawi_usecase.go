@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/Steven-Tampubolon/Vox-AI/infrastructure/gemini"
@@ -50,6 +51,7 @@ func NewBetawiUseCase(
 	}
 }
 
+// Chat - versi non-stream
 func (uc *BetawiUseCase) Chat(ctx context.Context, req *domain.ChatRequest) (*domain.ChatResponse, error) {
 	// 1. Buat atau ambil conversation
 	conv, err := uc.getOrCreateConversation(ctx, req)
@@ -89,6 +91,67 @@ func (uc *BetawiUseCase) Chat(ctx context.Context, req *domain.ChatRequest) (*do
 	}
 	if err := uc.chatRepo.SaveMessage(ctx, aiMsg); err != nil {
 		return nil, fmt.Errorf("save ai message: %w", err)
+	}
+
+	return &domain.ChatResponse{
+		ConversationID: conv.ID,
+		Character:      domain.CharacterBetawi,
+		Reply:          reply,
+	}, nil
+}
+
+// ChatStream - versi streaming untuk SSE
+// onChunk dipanggil setiap ada potongan teks baru dari Gemini, supaya handler
+// bisa langsung menulis ke http.ResponseWriter tanpa menunggu jawaban selesai.
+func (uc *BetawiUseCase) ChatStream(ctx context.Context, req *domain.ChatRequest, onChunk func(text string) error) (*domain.ChatResponse, error) {
+	conv, err := uc.getOrCreateConversation(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("get or create conversation: %w", err)
+	}
+
+	userMsg := &domain.Message{
+		ConversationID: conv.ID,
+		Role:           domain.RoleUser,
+		Content:        req.Message,
+		CreatedAt:      time.Now(),
+	}
+	if err := uc.chatRepo.SaveMessage(ctx, userMsg); err != nil {
+		return nil, fmt.Errorf("save user message: %w", err)
+	}
+
+	history, err := uc.buildHistory(ctx, conv.ID)
+	if err != nil {
+		return nil, fmt.Errorf("build history: %w", err)
+	}
+
+	var fullReply strings.Builder
+	streamErr := uc.aiRepo.GenerateStream(ctx, betawiSystemPrompt, history, func(chunk string) error {
+		fullReply.WriteString(chunk)
+		return onChunk(chunk)
+	})
+
+	reply := fullReply.String()
+
+	// Simpan reply meskipun stream berhenti di tengah jalan (mis. user tekan "STOP" / koneksi terputus)
+	// supaya history di DB tetap konsisten
+	if reply != "" {
+		aiMsg := &domain.Message{
+			ConversationID: conv.ID,
+			Role:           domain.RoleAssistant,
+			Content:        reply,
+			CreatedAt:      time.Now(),
+		}
+		if saveErr := uc.chatRepo.SaveMessage(ctx, aiMsg); saveErr != nil {
+			return nil, fmt.Errorf("save ai message: %w", err)
+		}
+	}
+
+	if streamErr != nil {
+		return nil, fmt.Errorf("generate stream reply: %w", streamErr)
+	}
+
+	if reply == "" {
+		return nil, fmt.Errorf("gemini tidak mengembalikan jawaban")
 	}
 
 	return &domain.ChatResponse{

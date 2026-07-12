@@ -1,12 +1,15 @@
 package gemini
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -46,16 +49,17 @@ type GenerateRequest struct {
 }
 
 type Candidate struct {
-	Content Content `json:"content"`
+	Content      Content `json:"content"`
+	FinishReason string  `json:"finishReason,omitempty"`
 }
 
 type GenerateResponse struct {
 	Candidates []Candidate `json:"candidates"`
 }
 
-// --- Public method ---
+// --- Public method (non-streaming) ---
 
-// Generate mengirim pesan ke Gemini dan mengembalikan teks jawaban
+// Generate mengirim pesan ke Gemini dan mengembalikan teks jawaban sekaligus (blocking)
 func (c *Client) Generate(ctx context.Context, systemPrompt string, history []Content) (string, error) {
 	req := GenerateRequest{
 		Contents: history,
@@ -113,6 +117,103 @@ func (c *Client) Generate(ctx context.Context, systemPrompt string, history []Co
 	}
 
 	return parts[0].Text, nil
+}
+
+// GenerateSteram blocking sampai:
+//   - stream selesai
+//   - onChunk mengembalikan error (misal client di sisi FE disconnect), atau
+//   - ctx dibatalkan (misal user tekan tombol stop / request timeout)
+func (c *Client) GenerateStream(ctx context.Context, systemPrompt string, history []Content, onChunk func(text string) error) error {
+	req := GenerateRequest{
+		Contents: history,
+	}
+	if systemPrompt != "" {
+		req.SystemInstruction = &Content{
+			Parts: []Part{{Text: systemPrompt}},
+		}
+	}
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return fmt.Errorf("marshal request: %w", err)
+	}
+
+	// alt=sse WAJIB ada - tanpa ini Gemini balikan 1 JSON array besar, bukan stream
+	url := fmt.Sprintf("%s/%s:streamGenerateContent?alt=sse", baseURL, model)
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(body))
+	if err != nil {
+		return fmt.Errorf("create request: %w", err)
+	}
+
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("x-goog-api-key", c.apiKey)
+	httpReq.Header.Set("Accept", "text/event-stream")
+
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return fmt.Errorf("send request: %w", err)
+	}
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			log.Printf("gagal menutup response body: %v", err)
+		}
+	}()
+
+	if resp.StatusCode != http.StatusOK {
+		errBody, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("gemini API error: status %d, body: %s", resp.StatusCode, string(errBody))
+	}
+
+	scanner := bufio.NewScanner(resp.Body)
+	// Naikan buffer default scanner 1MB (default 64KB per-baris) supaya aman
+	// Kalau satu event sse dari Gemini kebetulan panjang
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+
+	for scanner.Scan() {
+		// Kalau request dibatalkan (client disconnect / tombol stop ditekan)
+		// di step 4-5, hentikan pembacaan stream lebih awal
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+
+		line := scanner.Text()
+
+		// Format SSE Gemini: baris data diawali "data: ", baris kosong = pemisah event
+		if !strings.HasPrefix(line, "data: ") {
+			continue
+		}
+
+		payload := strings.TrimPrefix(line, "data: ")
+		if payload == "" {
+			continue
+		}
+
+		var chunk GenerateResponse
+		if err := json.Unmarshal([]byte(payload), &chunk); err != nil {
+			log.Printf("gagal parse chunk SSE gemini: %v, payload: %s", err, payload)
+			continue
+		}
+
+		if len(chunk.Candidates) == 0 || len(chunk.Candidates[0].Content.Parts) == 0 {
+			continue
+		}
+
+		text := chunk.Candidates[0].Content.Parts[0].Text
+		if text == "" {
+			continue
+		}
+
+		if err := onChunk(text); err != nil {
+			return fmt.Errorf("onChunk callback error: %w", err)
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return fmt.Errorf("scan stream: %w", err)
+	}
+
+	return nil
 }
 
 // Embed mengubah teks menjadi vector embedding

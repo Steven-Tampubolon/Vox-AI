@@ -114,7 +114,7 @@ func (uc *RAGUseCase) IndexDocument(ctx context.Context, conversationID, filenam
 	return doc, nil
 }
 
-// Chat tanya jawab berdasarkan dokumen
+// Chat tanya jawab berdasarkan dokumen - versi non-stream
 func (uc *RAGUseCase) Chat(ctx context.Context, req *domain.ChatRequest) (*domain.ChatResponse, error) {
 	conv, err := uc.getOrCreateRAGConversation(ctx, req)
 	if err != nil {
@@ -132,27 +132,10 @@ func (uc *RAGUseCase) Chat(ctx context.Context, req *domain.ChatRequest) (*domai
 		return nil, fmt.Errorf("save user message: %w", err)
 	}
 
-	// 2. Embed pertanyaan user
-	queryEmbedding, err := uc.aiRepo.Embed(ctx, req.Message)
+	// 2. embed query user + cari chunk  relevan
+	systemWithContext, err := uc.buildContextPrompt(ctx, conv.ID, req.Message)
 	if err != nil {
-		return nil, fmt.Errorf("embed query: %w", err)
-	}
-
-	// 3. Cari chunk paling relevan
-	allChunks, err := uc.docRepo.GetChunksByConversation(ctx, conv.ID)
-	if err != nil {
-		return nil, fmt.Errorf("get chunks: %w", err)
-	}
-
-	relevanChunks := findTopK(allChunks, queryEmbedding, 3)
-
-	// 4. Bangun prompt dengan konteks dokumen
-	var systemWithContext string
-	if len(relevanChunks) > 0 {
-		context := strings.Join(relevanChunks, "\n\n---\n\n")
-		systemWithContext = fmt.Sprintf("%s\n\nDOKUMEN RELEVAN:\n%s", ragSystemPrompt, context)
-	} else {
-		systemWithContext = ragSystemPrompt
+		return nil, err
 	}
 
 	// 5. Ambil history + kirim ke gemini
@@ -184,7 +167,94 @@ func (uc *RAGUseCase) Chat(ctx context.Context, req *domain.ChatRequest) (*domai
 	}, nil
 }
 
+// ChatStream - versi streaming untuk SSE.
+// Retrieval (embed query + cari chunk relevan) tetap dilakukan blocking di awal -
+// baru setelah context dokumen siap, generation di-stream ke onChunk.
+func (uc *RAGUseCase) ChatStream(ctx context.Context, req *domain.ChatRequest, onChunk func(text string) error) (*domain.ChatResponse, error) {
+	conv, err := uc.getOrCreateRAGConversation(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("get or create conversation: %w", err)
+	}
+
+	userMsg := &domain.Message{
+		ConversationID: conv.ID,
+		Role:           domain.RoleUser,
+		Content:        req.Message,
+		CreatedAt:      time.Now(),
+	}
+	if err := uc.chatRepo.SaveMessage(ctx, userMsg); err != nil {
+		return nil, fmt.Errorf("save user message: %w", err)
+	}
+
+	// Retrieval TIDAK di-stream - user akan lihat "typing indicator" selama
+	// bagian ini jalan, baru teks mulai muncul begitu Generate dimulai
+	systemWithContext, err := uc.buildContextPrompt(ctx, conv.ID, req.Message)
+	if err != nil {
+		return nil, err
+	}
+
+	history, err := uc.buildRAGHistory(ctx, conv.ID)
+	if err != nil {
+		return nil, fmt.Errorf("build history: %w", err)
+	}
+
+	var fullReply strings.Builder
+	streamErr := uc.aiRepo.GenerateStream(ctx, systemWithContext, history, func(chunk string) error {
+		fullReply.WriteString(chunk)
+		return onChunk(chunk)
+	})
+
+	reply := fullReply.String()
+
+	if reply != "" {
+		aiMsg := &domain.Message{
+			ConversationID: conv.ID,
+			Role:           domain.RoleAssistant,
+			Content:        reply,
+			CreatedAt:      time.Now(),
+		}
+		if saveErr := uc.chatRepo.SaveMessage(ctx, aiMsg); saveErr != nil {
+			return nil, fmt.Errorf("save ai message: %w", saveErr)
+		}
+	}
+
+	if streamErr != nil {
+		return nil, fmt.Errorf("generate stream reply: %w", streamErr)
+	}
+
+	if reply == "" {
+		return nil, fmt.Errorf("gemini tidak mengembalikan jawaban")
+	}
+
+	return &domain.ChatResponse{
+		ConversationID: conv.ID,
+		Character:      domain.CharacterRAG,
+		Reply:          reply,
+	}, nil
+}
+
 // --- Helper functions ---
+
+// buildContextPrompt: embed query + cari chunk relevan + gabung ke system prompt
+func (uc *RAGUseCase) buildContextPrompt(ctx context.Context, conversationID, message string) (string, error) {
+	queryEmbedding, err := uc.aiRepo.Embed(ctx, message)
+	if err != nil {
+		return "", fmt.Errorf("embed chunks: %w", err)
+	}
+
+	allChunks, err := uc.docRepo.GetChunksByConversation(ctx, conversationID)
+	if err != nil {
+		return "", fmt.Errorf("get chunks: %w", err)
+	}
+
+	relevanChunks := findTopK(allChunks, queryEmbedding, 3)
+
+	if len(relevanChunks) > 0 {
+		docContext := strings.Join(relevanChunks, "\n\n---\n\n")
+		return fmt.Sprintf("%s\n\nDOKUMEN RELEVAN:\n%s", ragSystemPrompt, docContext), nil
+	}
+	return ragSystemPrompt, nil
+}
 
 // SplitIntoChunks potong teks per N karakter, jaga batas kalimat
 func splitIntoChunks(text string, maxChars int) []string {

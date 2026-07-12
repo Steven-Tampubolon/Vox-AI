@@ -11,6 +11,7 @@ import (
 // tanpa ubah usecase sama sekali
 type AIRepository interface {
 	Generate(ctx context.Context, systemPrompt string, history []gemini.Content) (string, error)
+	GenerateStream(ctx context.Context, systemPrompt string, history []gemini.Content, onChunk func(text string) error) error
 	Embed(ctx context.Context, text string) ([]float64, error)
 }
 
@@ -25,6 +26,12 @@ func NewGeminiAIRepository(client *gemini.Client) AIRepository {
 
 func (r *GeminiAIRepository) Generate(ctx context.Context, systemPrompt string, history []gemini.Content) (string, error) {
 	return r.client.Generate(ctx, systemPrompt, history)
+}
+
+// GenerateStream meneruskan panggilan streaming ke gemini.Client.
+// onChunk dipanggil setiap ada potongan teks baru dari model.
+func (r *GeminiAIRepository) GenerateStream(ctx context.Context, systemPrompt string, history []gemini.Content, onChunk func(text string) error) error {
+	return r.client.GenerateStream(ctx, systemPrompt, history, onChunk)
 }
 
 func (r *GeminiAIRepository) Embed(ctx context.Context, text string) ([]float64, error) {

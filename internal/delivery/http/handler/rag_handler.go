@@ -2,6 +2,7 @@ package handler
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"log"
@@ -44,13 +45,9 @@ func (h *RAGHandler) Chat(c *gin.Context) {
 
 	req.Character = domain.CharacterRAG
 
-	resp, err := h.useCase.Chat(c.Request.Context(), &req)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusOK, resp)
+	streamChat(c, func(ctx context.Context, onChunk func(text string) error) (*domain.ChatResponse, error) {
+		return h.useCase.ChatStream(ctx, &req, onChunk)
+	})
 }
 
 // UploadDocument terima file dari frontend, index untuk RAG

@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/Steven-Tampubolon/Vox-AI/internal/domain"
@@ -30,11 +31,7 @@ func (h *BetawiHandler) Chat(c *gin.Context) {
 
 	req.Character = domain.CharacterBetawi
 
-	resp, err := h.useCase.Chat(c.Request.Context(), &req)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusOK, resp)
+	streamChat(c, func(ctx context.Context, onChunk func(text string) error) (*domain.ChatResponse, error) {
+		return h.useCase.ChatStream(ctx, &req, onChunk)
+	})
 }
