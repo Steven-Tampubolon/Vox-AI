@@ -156,7 +156,8 @@ GET /health
 
 ### 💬 Chat dengan Karakter
 
-Semua endpoint chat memakai **body & response yang konsisten**:
+> **⚠️ Breaking change di v1.1.0**: endpoint ini sekarang mengembalikan
+> **`text/event-stream` (SSE)**, bukan JSON tunggal seperti sebelumnya.
 
 ```http
 POST /api/v1/chat/{betawi|rag|git|explain}
@@ -169,16 +170,30 @@ Content-Type: application/json
 ```
 
 ```json
-// Response 200
-{
-  "conversation_id": "0e3f8b6e-7f...",
-  "character": "betawi",
-  "reply": "Pagi-pagi minum kopi panas, …"
-}
+// Response berupa stream `text/event-stream`, token demi token, dengan urutan event:
+data: {"content":"Pagi-pagi "}
+
+data: {"content":"minum kopi "}
+
+data: {"content":"panas..."}
+
+data: {"conversation_id":"0e3f8b6e-7f..."}
+
+data: [DONE]
 ```
 
-> ℹ️ Field `character` di body **diabaikan** — sudah dipaksa oleh endpoint masing-masing.
+| Event | Kapan muncul | Payload |
+|---|---|---|
+| `content` | Berkali-kali, tiap token/potongan teks baru dari Gemini | `{"content": "..."}` |
+| `conversation_id` | Sekali, setelah stream selesai normal | `{"conversation_id": "..."}` — penting untuk sesi baru |
+| `error` | Sekali, jika terjadi error di tengah stream | `{"error": "pesan error"}` |
+| `[DONE]` | Selalu, penanda akhir stream apapun hasilnya | literal string, bukan JSON |
 
+Koneksi tetap terbuka selama Gemini masih generate token. Client bisa memutus koneksi
+kapan saja (mis. tombol Stop di frontend) — reply yang sudah sempat diterima tetap
+tersimpan ke database, tidak hilang.
+
+> ℹ️ Field `character` di body **diabaikan** — sudah dipaksa oleh endpoint masing-masing.
 ### 📄 Upload Dokumen (khusus karakter RAG)
 
 ```http
@@ -246,7 +261,7 @@ Role di message: `user` | `assistant` | `system`.
 curl http://localhost:8080/health
 
 # Chat Betawi
-curl -X POST http://localhost:8080/api/v1/chat/betawi \
+curl -N -X POST http://localhost:8080/api/v1/chat/betawi \
   -H "Content-Type: application/json" \
   -d '{"message":"Buatin pantun tentang kopi dong bang!"}'
 
@@ -285,6 +300,24 @@ Rilis versi baru:
 git tag v1.0.0
 git push origin v1.0.0
 ```
+
+---
+
+## 📜 Changelog
+
+### v1.1.0
+- **feat**: chat response sekarang streaming via Server-Sent Events (SSE),
+  bukan tunggu-lalu-balas-sekaligus. Berlaku untuk 4 endpoint chat
+  (`betawi`, `rag`, `git`, `explain`)
+- **feat**: `gemini.Client` mendapat method `GenerateStream` menggunakan
+  endpoint `streamGenerateContent?alt=sse` dari Gemini API
+- **fix**: typo pada `Access-Control-Allow-Headers` di CORS middleware
+  (`content-typr` → `content-type`) yang memblokir preflight request browser
+- Reply yang belum selesai tetap disimpan ke DB jika stream terputus di
+  tengah jalan (client disconnect / dibatalkan)
+
+### v1.0.0
+- Rilis awal
 
 ---
 
