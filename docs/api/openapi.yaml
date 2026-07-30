@@ -1,0 +1,208 @@
+openapi: 3.0.3
+info:
+  title: Vox-AI Backend API
+  description: Multi-character AI chat & Voice API backend specifications for Vox-AI
+  version: 1.1.0
+servers:
+  - url: http://localhost:8080/api/v1
+    description: Local Development Server
+paths:
+  /characters:
+    get:
+      summary: List available AI characters
+      responses:
+        '200':
+          description: List of active characters
+  /chat/betawi:
+    post:
+      summary: Chat with Abang Betawi
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                message:
+                  type: string
+                conversation_id:
+                  type: string
+      responses:
+        '200':
+          description: AI response
+  /chat/rag:
+    post:
+      summary: Chat with Dokter Dokumen (RAG)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                message:
+                  type: string
+                conversation_id:
+                  type: string
+      responses:
+        '200':
+          description: AI response
+  /chat/git:
+    post:
+      summary: Chat with Git Master
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                message:
+                  type: string
+                conversation_id:
+                  type: string
+      responses:
+        '200':
+          description: AI response
+  /chat/explain:
+    post:
+      summary: Chat with Profesor Analogi
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                message:
+                  type: string
+                conversation_id:
+                  type: string
+      responses:
+        '200':
+          description: AI response
+  /document/upload:
+    post:
+      summary: Upload document for RAG chat
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Document uploaded and indexed
+  /conversations:
+    get:
+      summary: List chat history sessions
+      parameters:
+        - name: character
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Array of conversation metadata
+  /conversations/{id}:
+    delete:
+      summary: Delete a conversation session
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Session deleted
+    patch:
+      summary: Update conversation title
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+      responses:
+        '200':
+          description: Title updated
+  /conversations/{id}/messages:
+    get:
+      summary: Fetch messages in a conversation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of messages
+  /audio/transcribe:
+    post:
+      summary: Speech-to-Text Transcription
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Transcribed text
+  /audio/synthesize:
+    post:
+      summary: Text-to-Speech Synthesis
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                text:
+                  type: string
+                voice_id:
+                  type: string
+      responses:
+        '200':
+          description: Audio file binary (audio/wav or audio/mp3)
+  /voice/chat:
+    post:
+      summary: End-to-End Voice Chat
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                character:
+                  type: string
+                conversation_id:
+                  type: string
+      responses:
+        '200':
+          description: AI text and base64 audio response
