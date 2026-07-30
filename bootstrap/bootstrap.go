@@ -7,6 +7,7 @@ import (
 
 	"github.com/Steven-Tampubolon/Vox-AI/cli"
 	"github.com/Steven-Tampubolon/Vox-AI/config"
+	audiogemini "github.com/Steven-Tampubolon/Vox-AI/infrastructure/audio/gemini"
 	geminipkg "github.com/Steven-Tampubolon/Vox-AI/infrastructure/gemini"
 	"github.com/Steven-Tampubolon/Vox-AI/infrastructure/sqlite"
 	httpdelivery "github.com/Steven-Tampubolon/Vox-AI/internal/delivery/http"
@@ -76,6 +77,10 @@ func AppInit() {
 	gitUC := usecase.NewGitUseCase(aiRepo, chatRepo)
 	explainUC := usecase.NewExplainUseCase(aiRepo, chatRepo)
 
+	audioTranscriber := audiogemini.NewTranscriber(cfg.GeminiAPIKey)
+	audioSynthesizer := audiogemini.NewSynthesizer(cfg.GeminiAPIKey)
+	audioUC := usecase.NewAudioUsecase(audioTranscriber, audioSynthesizer, aiRepo, chatRepo)
+
 	// 6. Buat handlers
 	betawiH := handler.NewBetawiHandler(betawiUC)
 	ragH := handler.NewRAGHandler(ragUC)
@@ -83,11 +88,12 @@ func AppInit() {
 	explainH := handler.NewExplainHandler(explainUC)
 	convH := handler.NewConversationHandler(chatRepo)
 	characterH := handler.NewCharacterHandler()
+	audioH := handler.NewAudioHandler(audioUC)
 
 	// 7. Setup router
 	router := httpdelivery.NewRouter(
 		betawiH, ragH, gitH, explainH, convH,
-		characterH,
+		characterH, audioH,
 		cfg.AllowOrigin,
 	)
 

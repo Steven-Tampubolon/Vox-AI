@@ -16,6 +16,7 @@ func NewRouter(
 	explain *handler.ExplainHandler,
 	conv *handler.ConversationHandler,
 	character *handler.CharacterHandler,
+	audio *handler.AudioHandler,
 	allowOrigin string,
 ) *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
@@ -57,6 +58,14 @@ func NewRouter(
 			convGroup.PATCH("/:id", conv.UpdateTitle)        // rename judul
 			convGroup.GET("/:id/messages", conv.GetMessages) // pesan dalam sesi support filter ?character
 		}
+
+		// Audio & Voice
+		audioGroup := api.Group("/audio")
+		{
+			audioGroup.POST("/transcribe", audio.Transcribe)
+			audioGroup.POST("/synthesize", audio.Synthesize)
+		}
+		api.POST("/voice/chat", audio.VoiceChat)
 	}
 
 	return router
