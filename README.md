@@ -30,6 +30,7 @@ Mengikuti **Clean Architecture / Onion** — dependencies hanya mengarah ke dala
 ┌──────────────────────────────────────────────────────────────┐
 │  internal/delivery/http  (Gin handlers + middleware)         │
 │  ─ handler/        : betawi, rag, git, explain, conversation │
+│  ─ handler/audio   : transcribe, synthesize, voice chat      │
 │  ─ middleware/     : CORS, Logger, RateLimiter               │
 └──────────────────────────────────────────────────────────────┘
             │
@@ -38,19 +39,22 @@ Mengikuti **Clean Architecture / Onion** — dependencies hanya mengarah ke dala
 │  internal/usecase   (business logic murni)                   │
 │  ─ betawi_usecase   ─ rag_usecase                            │
 │  ─ git_usecase      ─ explain_usecase                        │
+│  ─ audio_usecase    (STT → AI → TTS pipeline)                │
 └──────────────────────────────────────────────────────────────┘
             │
             ▼
 ┌──────────────────────────────────────────────────────────────┐
 │  internal/repository  (interface)                            │
 │  ─ AIRepository  ─ ChatRepository  ─ DocumentRepository      │
+│  ─ AudioTranscriber  ─ AudioSynthesizer                      │
 └──────────────────────────────────────────────────────────────┘
             │
             ▼
 ┌──────────────────────────────────────────────────────────────┐
 │  infrastructure/   (implementasi konkret)                    │
-│  ─ gemini/   : HTTP client ke Google Generative Language API │
-│  ─ sqlite/   : chat_store, document_store + migrasi          │
+│  ─ gemini/        : HTTP client ke Google Generative Language API │
+│  ─ audio/gemini/  : STT (Transcribe) + TTS (Synthesize) adapter  │
+│  ─ sqlite/        : chat_store, document_store + migrasi          │
 └──────────────────────────────────────────────────────────────┘
 ```
 
@@ -63,16 +67,21 @@ Mengikuti **Clean Architecture / Onion** — dependencies hanya mengarah ke dala
 ├── config/config.go               # Loader .env
 ├── cli/banner.go                  # ASCII banner & info startup
 ├── internal/
-│   ├── domain/                    # Entitas inti (Character, Message, Conversation, Document, Chunk)
+│   ├── domain/                    # Entitas inti (Character, Message, Conversation, Document, Chunk, Audio)
 │   ├── delivery/http/
 │   │   ├── router.go              # Route definition
-│   │   ├── handler/               # HTTP handlers
+│   │   ├── handler/               # HTTP handlers (text chat + audio)
 │   │   └── middleware/            # CORS, Logger, RateLimiter
-│   ├── repository/                # Interface (port)
-│   └── usecase/                   # Business logic per-karakter
+│   ├── repository/                # Interface (port) termasuk AudioTranscriber & AudioSynthesizer
+│   └── usecase/                   # Business logic per-karakter + AudioUsecase
 ├── infrastructure/
 │   ├── gemini/client.go           # Gemini API client (Generate + Embed)
+│   ├── audio/gemini/              # Gemini Audio adapter (STT + TTS)
 │   └── sqlite/                    # Persistence layer
+├── docs/
+│   ├── api/openapi.yaml           # OpenAPI 3.0 spec (Frontend handover)
+│   ├── handover/                  # Frontend integration guide
+│   └── superpowers/               # Design specs & implementation plans
 ├── deploy/                        # docker-compose.yml untuk end-user (tanpa clone repo)
 ├── go.mod / go.sum
 └── .env.example
@@ -234,6 +243,62 @@ GET /api/v1/conversations/:id/messages
 
 Role di message: `user` | `assistant` | `system`.
 
+### 🎙️ Voice & Audio API
+
+#### STT — Transkripsi Suara ke Teks
+
+```http
+POST /api/v1/audio/transcribe
+Content-Type: multipart/form-data
+
+file: <file audio, wajib — format: wav, mp3, webm, ogg>
+```
+
+```json
+// Response 200
+{ "text": "Halo, saya ingin tanya soal...", "language": "id", "duration_seconds": 3.2 }
+```
+
+#### TTS — Sintesis Teks ke Suara
+
+```http
+POST /api/v1/audio/synthesize
+Content-Type: application/json
+
+{ "text": "Halo bang, ada yang bisa dibantu?", "voice_id": "default", "speed": 1.0 }
+```
+
+```
+// Response 200 — binary audio (Content-Type: audio/wav)
+<audio bytes>
+```
+
+#### Voice Chat — End-to-End (Suara Masuk → AI → Suara Keluar)
+
+```http
+POST /api/v1/voice/chat
+Content-Type: multipart/form-data
+
+file:            <file audio rekaman user, wajib>
+character:       betawi | rag | git | explain
+conversation_id: <opsional, kosong = buat sesi baru>
+```
+
+```json
+// Response 200
+{
+  "user_text":       "Bang, cariin pantun soal kopi dong",
+  "ai_text":         "Pagi hari minum kopi, badan jadi segar berseri...",
+  "audio_base64":    "UklGRiQ...",
+  "mime_type":       "audio/wav",
+  "conversation_id": "0e3f8b6e-7f..."
+}
+```
+
+> ℹ️ Audio response dikembalikan dalam format **base64** di dalam JSON agar mudah dikonsumsi frontend. Untuk panduan integrasi lengkap lihat [`docs/handover/frontend-voice-guide.md`](./docs/handover/frontend-voice-guide.md).
+
+> 📄 Spesifikasi OpenAPI 3.0 lengkap untuk semua endpoint tersedia di [`docs/api/openapi.yaml`](./docs/api/openapi.yaml).
+
 ---
 
 ## ⚙️ Konfigurasi
@@ -304,6 +369,17 @@ git push origin v1.0.0
 ---
 
 ## 📜 Changelog
+
+### v1.2.0
+- **feat**: Voice / Audio API — 3 endpoint baru untuk STT, TTS, dan end-to-end Voice Chat
+  - `POST /api/v1/audio/transcribe` — transkripsi audio ke teks (STT)
+  - `POST /api/v1/audio/synthesize` — sintesis teks ke audio WAV (TTS)
+  - `POST /api/v1/voice/chat` — pipeline suara masuk → AI karakter → suara keluar
+- **feat**: `infrastructure/audio/gemini` — adapter modular `Transcriber` & `Synthesizer`
+  (implementasikan `repository.AudioTranscriber` & `repository.AudioSynthesizer`)
+- **feat**: `internal/usecase/audio_usecase.go` — pipeline VoiceChat: STT → AI prompt → TTS → base64 response
+- **docs**: OpenAPI 3.0 spec di `docs/api/openapi.yaml` mencakup seluruh endpoint Vox-AI
+- **docs**: Frontend handover guide di `docs/handover/frontend-voice-guide.md` (MediaRecorder snippet, payload contract, playback example)
 
 ### v1.1.0
 - **feat**: chat response sekarang streaming via Server-Sent Events (SSE),
