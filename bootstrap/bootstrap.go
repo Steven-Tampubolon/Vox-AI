@@ -12,6 +12,7 @@ import (
 	"github.com/Steven-Tampubolon/Vox-AI/infrastructure/sqlite"
 	httpdelivery "github.com/Steven-Tampubolon/Vox-AI/internal/delivery/http"
 	"github.com/Steven-Tampubolon/Vox-AI/internal/delivery/http/handler"
+	"github.com/Steven-Tampubolon/Vox-AI/internal/domain"
 	"github.com/Steven-Tampubolon/Vox-AI/internal/repository"
 	"github.com/Steven-Tampubolon/Vox-AI/internal/usecase"
 )
@@ -79,7 +80,13 @@ func AppInit() {
 
 	audioTranscriber := audiogemini.NewTranscriber(cfg.GeminiAPIKey)
 	audioSynthesizer := audiogemini.NewSynthesizer(cfg.GeminiAPIKey)
-	audioUC := usecase.NewAudioUsecase(audioTranscriber, audioSynthesizer, aiRepo, chatRepo)
+	characterChatMap := map[domain.Character]usecase.CharacterChatUsecase{
+		domain.CharacterBetawi:  betawiUC,
+		domain.CharacterRAG:     ragUC,
+		domain.CharacterGit:     gitUC,
+		domain.CharacterExplain: explainUC,
+	}
+	audioUC := usecase.NewAudioUsecase(audioTranscriber, audioSynthesizer, characterChatMap)
 
 	// 6. Buat handlers
 	betawiH := handler.NewBetawiHandler(betawiUC)
