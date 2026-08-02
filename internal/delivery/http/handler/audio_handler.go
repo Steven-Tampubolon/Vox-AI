@@ -29,7 +29,10 @@ func (h *AudioHandler) Transcribe(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "unable to read file"})
 		return
 	}
-	defer file.Close()
+	defer func() {
+		_ = file.Close()
+
+	}()
 
 	data, err := io.ReadAll(file)
 	if err != nil {
@@ -81,7 +84,10 @@ func (h *AudioHandler) VoiceChat(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "unable to read file"})
 		return
 	}
-	defer file.Close()
+	defer func() {
+		_ = file.Close()
+
+	}()
 
 	data, _ := io.ReadAll(file)
 
