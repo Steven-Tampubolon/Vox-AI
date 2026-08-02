@@ -83,6 +83,7 @@ func PrintSystemInfo(cfg *config.Config) {
 
 func PrintEndpoints(port string) {
 	green := color.New(color.FgGreen, color.Bold)
+	blue := color.New(color.FgBlue, color.Bold)
 	// cyan := color.New(color.FgCyan)
 	// yellow := color.New(color.FgYellow, color.Bold)
 	// white := color.New(color.FgWhite)
@@ -124,7 +125,8 @@ func PrintEndpoints(port string) {
 	// dim.Println("  ── Karakter ────────────────────────────────────")
 	// PrintEndpoint(white, cyan, yellow, "GET		 ", base+"/api/v1/characters", "List 4 karakter")
 
-	green.Printf("  Server berjalan di %s\n", base)
+	blue.Printf("  Server berjalan di %s\n", base)
+	green.Printf("  SWAGGER UI tersedia di %s/api-docs/index.html\n", base)
 	dim.Println("  Tekan Ctrl+C untuk berhenti")
 	fmt.Println()
 	dim.Println("  ────────────────────────────────────────────────")
