@@ -7,6 +7,8 @@ import (
 	"github.com/Steven-Tampubolon/Vox-AI/internal/delivery/http/handler"
 	"github.com/Steven-Tampubolon/Vox-AI/internal/delivery/http/middleware"
 	"github.com/gin-gonic/gin"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
 func NewRouter(
@@ -32,6 +34,14 @@ func NewRouter(
 	router.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok", "service": "VoxAI"})
 	})
+
+	// ── Swagger UI Documentation ───────────────────────────
+	// 1. Serve file openapi.yaml secara statis agar bisa dibaca Swagger UI
+	router.StaticFile("/openapi.yaml", "./docs/api/openapi.yaml")
+
+	// 2. Setup Swagger UI yang mengarah ke file openapi.yaml
+	swaggerURL := ginSwagger.URL("/openapi.yaml")
+	router.GET("/api-docs/*any", ginSwagger.WrapHandler(swaggerFiles.Handler, swaggerURL))
 
 	// ── API v1 ─────────────────────────────────────────────
 	api := router.Group("/api/v1")
