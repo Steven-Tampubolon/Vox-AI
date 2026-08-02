@@ -37,7 +37,7 @@ func (h *AudioHandler) Transcribe(c *gin.Context) {
 		return
 	}
 
-	res, err := h.audioUC.TranscribeAudio(c.Request.Context(), domain.AudioRequest{
+	res, err := h.audioUC.Transcribe(c.Request.Context(), domain.AudioRequest{
 		Data:     data,
 		Filename: fileHeader.Filename,
 		MimeType: fileHeader.Header.Get("Content-Type"),
