@@ -21,7 +21,7 @@ import (
 const (
 	ttsBaseURL   = "https://generativelanguage.googleapis.com/v1beta/models"
 	ttsModel     = "gemini-2.5-flash-preview-tts" // model khusus TTS preview
-	defaultVoice = "Pulcherrima"
+	defaultVoice = "Kore"
 )
 
 type ttsPart struct {
@@ -29,29 +29,31 @@ type ttsPart struct {
 }
 
 type ttsContent struct {
+	Role  string    `json:"role"`
 	Parts []ttsPart `json:"parts"`
 }
 
 type ttsPrebuildVoiceConfig struct {
-	VoiceName string `json:"voiceName"`
+	VoiceName string `json:"voice_name"`
 }
 
-type ttsVoiceConfig struct {
-	PrebuiltVoiceConfig ttsPrebuildVoiceConfig `json:"prebuiltVoiceConfig"`
+type ttsSpeechVoiceConfig struct {
+	PrebuiltVoiceConfig ttsPrebuildVoiceConfig `json:"prebuilt_voice_config"`
 }
 
 type ttsSpeechConfig struct {
-	VoiceConfig ttsVoiceConfig `json:"voiceConfig"`
+	VoiceConfig ttsSpeechVoiceConfig `json:"voice_config"`
 }
 
-type ttsGenerateConfig struct {
+type ttsGenerationConfig struct {
 	ResponseModalities []string        `json:"responseModalities"`
-	SpeechConfig       ttsSpeechConfig `json:"speechConfig"`
+	Temperature        float64         `json:"temperature"`
+	SpeechConfig       ttsSpeechConfig `json:"speech_config"`
 }
 
 type ttsRequest struct {
-	Contents         []ttsContent      `json:"contents"`
-	GenerationConfig ttsGenerateConfig `json:"generationConfig"`
+	Contents         []ttsContent        `json:"contents"`
+	GenerationConfig ttsGenerationConfig `json:"generationConfig"`
 }
 
 type ttsResponse struct {
@@ -75,7 +77,7 @@ type Synthesizer struct {
 func NewSynthesizer(apiKey string) repository.AudioSynthesizer {
 	return &Synthesizer{
 		apiKey:     apiKey,
-		httpClient: &http.Client{Timeout: 60 * time.Second},
+		httpClient: &http.Client{Timeout: 120 * time.Second},
 	}
 }
 
@@ -89,12 +91,28 @@ func (s *Synthesizer) Synthesize(ctx context.Context, req domain.SynthesizeReque
 		voice = defaultVoice
 	}
 
+	var fullPrompt string
+	if req.AudioProfile != "" {
+		fullPrompt = fmt.Sprintf("%s\n\n## Transcript:\n%s", req.AudioProfile, req.Text)
+	} else {
+		fullPrompt = fmt.Sprintf(
+			"Read the following transcript clearly and naturally.\n\n## Transcript:\n%s",
+			req.Text,
+		)
+	}
+
 	payload := ttsRequest{
-		Contents: []ttsContent{{Parts: []ttsPart{{Text: req.Text}}}},
-		GenerationConfig: ttsGenerateConfig{
-			ResponseModalities: []string{"AUDIO"},
+		Contents: []ttsContent{
+			{
+				Role:  "user",
+				Parts: []ttsPart{{Text: fullPrompt}},
+			},
+		},
+		GenerationConfig: ttsGenerationConfig{
+			ResponseModalities: []string{"audio"},
+			Temperature:        2,
 			SpeechConfig: ttsSpeechConfig{
-				VoiceConfig: ttsVoiceConfig{
+				VoiceConfig: ttsSpeechVoiceConfig{
 					PrebuiltVoiceConfig: ttsPrebuildVoiceConfig{VoiceName: voice},
 				},
 			},
@@ -187,7 +205,7 @@ func pcmToWav(pcm []byte, sampleRate, numChannels, bitsPerSample int) []byte {
 	writeUint32LE(buf, uint32(36+dataSize))
 	buf.WriteString("WAVE")
 
-	buf.WriteString("fmt")
+	buf.WriteString("fmt ")
 	writeUint32LE(buf, 16) // ukuran sub-chunk fmt (PCM = 16)
 	writeUint16LE(buf, 1)  // audio format 1 = PCM (uncompressed)
 	writeUint16LE(buf, uint16(numChannels))
