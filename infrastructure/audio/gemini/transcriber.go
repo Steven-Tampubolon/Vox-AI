@@ -19,7 +19,7 @@ import (
 
 const (
 	sttBaseURL = "https://generativelanguage.googleapis.com/v1beta/models"
-	sttModel   = "gemini-2.5-flash-lite" // multimodal dan bisa terima input audio
+	sttModel   = "gemini-3.5-flash-lite" // multimodal dan bisa terima input audio
 )
 
 // transcribePrompt - menegembalikan teks transkripsi mentah tanpa basa-basi/terjemahan/markdown
@@ -67,7 +67,7 @@ type Transcriber struct {
 func NewTranscriber(apiKey string) repository.AudioTranscriber {
 	return &Transcriber{
 		apiKey:     apiKey,
-		httpClient: &http.Client{Timeout: 60 * time.Second},
+		httpClient: &http.Client{Timeout: 120 * time.Second},
 	}
 }
 
