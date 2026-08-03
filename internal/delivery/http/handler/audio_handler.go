@@ -1,8 +1,10 @@
 package handler
 
 import (
+	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/Steven-Tampubolon/Vox-AI/internal/domain"
 	"github.com/Steven-Tampubolon/Vox-AI/internal/usecase"
@@ -62,6 +64,17 @@ func (h *AudioHandler) Synthesize(c *gin.Context) {
 
 	res, err := h.audioUC.SynthesizeText(c.Request.Context(), req)
 	if err != nil {
+		// 🚨 LOG ERROR INI AKAN MENAMPILKAN PESAN DARI GEMINI DI TERMINAL
+		fmt.Printf("\n[GEMINI ERROR DETECTED]: %v\n\n", err)
+
+		// Simpan error ke Gin Context agar tercium oleh middleware logger jika diperlukan
+		_ = c.Error(err)
+
+		if strings.Contains(err.Error(), "status 429") {
+			c.JSON(http.StatusTooManyRequests, gin.H{"error": "Quota Gemini habis / Rate limit exceeded"})
+			return
+		}
+
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
