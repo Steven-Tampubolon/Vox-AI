@@ -13,9 +13,10 @@ type TranscribeResult struct {
 }
 
 type SynthesizeRequest struct {
-	Text    string  `json:"text"`
-	VoiceID string  `json:"voice_id"`
-	Speed   float64 `json:"speed"`
+	Text         string  `json:"text"`
+	VoiceID      string  `json:"voice_id"`
+	Speed        float64 `json:"speed,omitempty"`
+	AudioProfile string  `json:"-"` // internal tidak diekspos ke FE
 }
 
 type SynthesizeResult struct {
