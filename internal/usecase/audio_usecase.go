@@ -55,6 +55,14 @@ func (u *AudioUsecase) VoiceChat(ctx context.Context, character string, convID s
 		return nil, fmt.Errorf("karakter '%s' belum didukung untuk voice chat", character)
 	}
 
+	profile, ok := chatracterVoiceProfiles[char]
+	if !ok {
+		profile = VoiceProfile{
+			VoiceID:      "Kore",
+			AudioProfile: "Read the following transcript clearly and naturally.\n\n## Transcript:",
+		}
+	}
+
 	// 1. STT - audio user jadi teks
 	stt, err := u.transcriber.Transcribe(ctx, req)
 	if err != nil {
@@ -77,7 +85,11 @@ func (u *AudioUsecase) VoiceChat(ctx context.Context, character string, convID s
 	}
 
 	// 3. TTS - balasan AI jadi audio
-	tts, err := u.synthesizer.Synthesize(ctx, domain.SynthesizeRequest{Text: chatRes.Reply})
+	tts, err := u.synthesizer.Synthesize(ctx, domain.SynthesizeRequest{
+		Text:         chatRes.Reply,
+		VoiceID:      profile.VoiceID,
+		AudioProfile: profile.AudioProfile,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("synthesize audio: %w", err)
 	}
