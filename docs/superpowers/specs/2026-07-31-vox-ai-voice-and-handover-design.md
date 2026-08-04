@@ -1,25 +1,36 @@
 # Design Spec: Vox-AI Voice / Audio API & Frontend Handover
 
 - **Date**: 2026-07-31
-- **Status**: Approved
+- **Updated**: 2026-08-03
+- **Status**: Implemented (v1.2.0)
 - **Scope**: Backend Audio Upgrade (STT, TTS, Voice Chat) & OpenAPI/Frontend Handover Documentation
 
 ---
 
 ## 1. Overview
-Vox-AI backend is being expanded to support voice/audio capabilities alongside existing multi-character text chats. 
-This feature introduces Speech-to-Text (STT), Text-to-Speech (TTS), and an end-to-end Voice Chat pipeline, while providing complete OpenAPI 3.0 specs and Frontend integration documentation for handover.
+Vox-AI backend diperluas untuk mendukung kemampuan voice/audio di samping text chat
+multi-karakter yang sudah ada. Fitur ini menghadirkan Speech-to-Text (STT),
+Text-to-Speech (TTS), dan pipeline Voice Chat end-to-end, beserta OpenAPI 3.0 spec
+dan dokumentasi integrasi Frontend untuk handover.
 
 ---
 
 ## 2. Architecture & Design Principles
 
-Following Onion / Clean Architecture:
-- **Domain Layer (`internal/domain`)**: Core data structures for audio requests, transcriptions, synthesis, and voice chat results.
-- **Repository Interfaces (`internal/repository`)**: Abstract `AudioTranscriber` and `AudioSynthesizer` ports.
-- **Infrastructure Layer (`infrastructure/audio/gemini`)**: Concrete Gemini API adapter implementing STT and TTS interfaces.
-- **Business Logic Layer (`internal/usecase`)**: `AudioUsecase` coordinating audio transcription, character prompt chat generation, audio synthesis, and conversation history persistence.
-- **Delivery Layer (`internal/delivery/http`)**: Gin HTTP handlers and routes for STT, TTS, Voice Chat, and OpenAPI/Handover docs.
+Mengikuti Onion / Clean Architecture:
+- **Domain Layer (`internal/domain`)**: Struktur data inti untuk audio request,
+  transkripsi, sintesis, voice chat result, dan audio profile per karakter.
+- **Repository Interfaces (`internal/repository`)**: Abstract port `AudioTranscriber`
+  dan `AudioSynthesizer`.
+- **Infrastructure Layer (`infrastructure/audio/gemini`)**: Adapter Gemini API konkret
+  yang mengimplementasikan STT (generateContent multimodal) dan TTS
+  (generateContent dengan speech_config, output PCM → WAV).
+- **Business Logic Layer (`internal/usecase`)**: `AudioUsecase` mengkoordinasikan
+  transkripsi audio, delegasi ke character usecase (yang handle history, system prompt,
+  dan persistence), sintesis audio, serta `voice_profiles.go` sebagai sumber
+  kebenaran konfigurasi suara per karakter.
+- **Delivery Layer (`internal/delivery/http`)**: Gin HTTP handler dan route untuk
+  STT, TTS, Voice Chat.
 
 ---
 
@@ -42,9 +53,13 @@ type TranscribeResult struct {
 }
 
 type SynthesizeRequest struct {
-    Text    string  `json:"text"`
-    VoiceID string  `json:"voice_id"`
-    Speed   float64 `json:"speed"`
+    Text         string  `json:"text"`
+    VoiceID      string  `json:"voice_id"`
+    Speed        float64 `json:"speed"`
+    // AudioProfile membawa instruksi karakter (audio profile + director's note
+    // + scene) dari usecase ke synthesizer. Tag json:"-" supaya tidak
+    // terekspos ke FE via request/response.
+    AudioProfile string  `json:"-"`
 }
 
 type SynthesizeResult struct {
@@ -80,48 +95,123 @@ type AudioSynthesizer interface {
 ```
 
 ### 3.3 Infrastructure Layer (`infrastructure/audio/gemini`)
-- **`transcriber.go`**: Encapsulates audio data handling and calls Gemini Multimodal API inline or file upload API for transcription.
-- **`synthesizer.go`**: Calls Gemini audio output capability or fallback TTS service to output WAV/MP3 bytes.
 
-### 3.4 Usecase Layer (`internal/usecase/audio_usecase.go`)
+**`transcriber.go`** — STT via Gemini generateContent multimodal:
+- Kirim audio sebagai base64 `inlineData` ke endpoint `generateContent`
+  model `gemini-2.5-flash-lite` (model yang sama dengan chat teks, sudah multimodal)
+- Prompt instruksi verbatim supaya output hanya teks transkripsi mentah
+- `normalizeAudioMime` membersihkan parameter codec dari Content-Type browser
+  (mis. `audio/webm;codecs=opus` → `audio/webm`) dan fallback berdasarkan ekstensi
+- ⚠️ Format `audio/webm` (default `MediaRecorder` Chrome) tidak ada dalam daftar
+  resmi format yang didukung Gemini STT. Format yang direkomendasikan:
+  `audio/ogg;codecs=opus`, `audio/wav`, `audio/mp3`, `audio/flac`
+
+**`synthesizer.go`** — TTS via Gemini generateContent dengan audio output:
+- Endpoint: `generateContent` model `gemini-2.5-flash-preview-tts`
+- Field `speech_config` menggunakan **snake_case** (`voice_config`,
+  `prebuilt_voice_config`, `voice_name`) — camelCase diabaikan Gemini dan
+  menyebabkan model fallback ke text generation (error 400)
+- `responseModalities: ["audio"]` dan `temperature: 2` sesuai rekomendasi
+  Google AI Studio untuk output TTS yang ekspresif
+- Gemini mengembalikan raw PCM 16-bit mono (`audio/L16;codec=pcm;rate=24000`),
+  bukan file WAV utuh — BE membungkus PCM dengan header WAV 44-byte via
+  `pcmToWav()` supaya browser bisa langsung memutar via `new Audio(...)`
+
+### 3.4 Usecase Layer
+
+#### `audio_usecase.go`
+
+**Desain kunci**: `AudioUsecase` tidak mengakses `AIRepository` atau `ChatRepository`
+secara langsung. Sebaliknya, ia bergantung pada interface `CharacterChatUsecase` yang
+sudah dipenuhi oleh `BetawiUseCase`, `RAGUseCase`, `GitUseCase`, dan `ExplainUseCase`.
+Ini memastikan VoiceChat reuse system prompt, history building, dan persistence
+yang sudah ada di masing-masing usecase karakter — tanpa duplikasi logic.
+
 ```go
+type CharacterChatUsecase interface {
+    Chat(ctx context.Context, req *domain.ChatRequest) (*domain.ChatResponse, error)
+}
+
 type AudioUsecase struct {
-    transcriber transcriber.AudioTranscriber
-    synthesizer synthesizer.AudioSynthesizer
-    aiRepo      repository.AIRepository
-    chatRepo    repository.ChatRepository
+    transcriber repository.AudioTranscriber
+    synthesizer repository.AudioSynthesizer
+    characters  map[domain.Character]CharacterChatUsecase
 }
 ```
-Key Workflow for `VoiceChat`:
-1. Receive audio input file (`domain.AudioRequest`).
-2. `TranscribeAudio` -> get `UserText`.
-3. Load existing history for `ConversationID` (or start new conversation).
-4. Run AI Usecase prompt for specified character slug (`betawi`, `rag`, `git`, `explain`).
-5. `SynthesizeText` for `AIText` -> get `AudioData`.
-6. Save message pair to SQLite (`ChatRepository`).
-7. Return `VoiceChatResult` with `AudioBase64` & metadata.
+
+Key Workflow untuk `VoiceChat`:
+1. Validasi `character` slug — return error kalau tidak dikenal
+2. Lookup `CharacterChatUsecase` dari map berdasarkan karakter
+3. Lookup `VoiceProfile` (VoiceID + AudioProfile) dari `characterVoiceProfiles`
+4. **STT** — `transcriber.Transcribe()` → `UserText`
+5. **AI** — `chatUC.Chat()` dengan `UserText` sebagai message → `AIText`
+   (history load, system prompt karakter, persistence ke SQLite semua
+   dihandle oleh usecase karakter — bukan AudioUsecase)
+6. **TTS** — `synthesizer.Synthesize()` dengan `AIText` + `VoiceProfile` → `AudioData`
+7. Return `VoiceChatResult` dengan `AudioBase64` & metadata
+
+#### `voice_profiles.go` ← file baru
+
+Sumber kebenaran tunggal untuk konfigurasi suara per karakter. Berisi map
+`characterVoiceProfiles` dengan tipe `map[domain.Character]VoiceProfile`.
+
+```go
+type VoiceProfile struct {
+    VoiceID      string // nama suara Gemini TTS (mis. Puck, Charon, Fenrir)
+    AudioProfile string // full audio profile + director's note + scene instruction
+}
+```
+
+Mapping karakter → suara:
+| Karakter | VoiceID | Persona Suara |
+|---|---|---|
+| `betawi` | Puck | Hangat, kasual, energik |
+| `rag` | Charon | Profesional, informatif, presisi |
+| `git` | Fenrir | Antusias, teknikal, encouraging |
+| `explain` | Sadaltager | Bijaksana, sabar, edukatif |
+
+Untuk mengganti suara atau instruksi karakter, cukup edit file ini —
+tidak perlu menyentuh usecase atau handler manapun.
 
 ### 3.5 Delivery Layer (`internal/delivery/http/handler/audio_handler.go`)
-Endpoints:
-- `POST /api/v1/audio/transcribe`: Expects `file` in `multipart/form-data`.
-- `POST /api/v1/audio/synthesize`: Expects JSON body `{"text": "...", "voice_id": "..."}`.
-- `POST /api/v1/voice/chat`: Expects `multipart/form-data` with fields `file` (audio), `character` (string), `conversation_id` (optional string).
+
+Endpoints (tidak berubah dari spec awal):
+- `POST /api/v1/audio/transcribe` — `multipart/form-data` field `file`
+- `POST /api/v1/audio/synthesize` — JSON `{"text": "...", "voice_id": "..."}`
+  → response binary WAV (bukan JSON)
+- `POST /api/v1/voice/chat` — `multipart/form-data` field `file`, `character`,
+  `conversation_id` (opsional)
 
 ---
 
 ## 4. Documentation & Handover Artifacts
 
-1. **OpenAPI 3.0 Specification**: `docs/api/openapi.yaml`
-   - Complete endpoint definitions, schemas, request/response models for all Vox-AI endpoints (`/chat`, `/conversations`, `/audio`, `/voice`).
+1. **OpenAPI 3.0 Specification** (v1.2.0): `docs/api/openapi.yaml`
+   - Definisi endpoint lengkap dengan schema request/response eksplisit
+   - `components/schemas`: `ErrorResponse`, `ChatRequest`, `ChatResponse`,
+     `TranscribeResponse`, `VoiceChatResponse`
+   - Response type `/audio/synthesize` eksplisit sebagai `audio/wav` binary
+   - Error response 400/500 di semua endpoint
+   - Warning format `audio/webm` di endpoint STT dan voice chat
+
 2. **Frontend Handover Integration Guide**: `docs/handover/frontend-voice-guide.md`
-   - Detailed instructions for Frontend engineers:
-     - MediaRecorder browser recording setup (WebM/WAV).
-     - Payload schemas for voice chat and audio utilities.
-     - Sample code snippets for playing audio responses using HTML5 Audio / Web Audio API.
+   - Setup `MediaRecorder` dengan format `audio/ogg;codecs=opus` (rekomendasi)
+     beserta fallback detection
+   - Warning: `audio_base64` bisa 5–10MB, jangan di-log ke console
+   - Contoh lengkap dengan state management `conversation_id` antar giliran
+   - Tabel error response yang mungkin muncul beserta penyebabnya
+   - Catatan performa: latency 2–5 detik, tambahkan loading state
+   - Endpoint `/audio/synthesize` return binary WAV — gunakan `response.blob()`
 
 ---
 
 ## 5. Verification & Testing Strategy
-- Unit tests for `internal/usecase/audio_usecase_test.go` using mocks for `AudioTranscriber` & `AudioSynthesizer`.
-- Integration tests for `internal/delivery/http/handler/audio_handler_test.go`.
-- Manual verification of audio endpoints using curl / sample audio file.
+
+- **Unit tests** (`internal/usecase/audio_usecase_test.go`): Mock
+  `AudioTranscriber`, `AudioSynthesizer`, dan `CharacterChatUsecase`.
+  Test memverifikasi bahwa `VoiceChat` memanggil `Chat()` dengan hasil
+  transkripsi STT sebagai message (bukan hardcoded string).
+- **Manual curl test**: Verifikasi ketiga endpoint audio dengan file audio sample.
+  Cek header WAV valid via `xxd output.wav | head -1` dan playback via `aplay`.
+- **Integration test** (`internal/delivery/http/handler/audio_handler_test.go`):
+  Belum diimplementasikan — kandidat untuk sprint berikutnya.
