@@ -2,10 +2,79 @@ openapi: 3.0.3
 info:
   title: Vox-AI Backend API
   description: Multi-character AI chat & Voice API backend specifications for Vox-AI
-  version: 1.1.0
+  version: 1.2.0
 servers:
   - url: http://localhost:8080/api/v1
     description: Local Development Server
+
+components:
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          example: "pesan error dari server"
+
+    ChatRequest:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+          example: "Halo bang, apa kabar?"
+        conversation_id:
+          type: string
+          example: "0955b295-3d7a-44b3-9c24-c640d2f1bd34"
+
+    ChatResponse:
+      type: object
+      properties:
+        conversation_id:
+          type: string
+          example: "0955b295-3d7a-44b3-9c24-c640d2f1bd34"
+        character:
+          type: string
+          example: "betawi"
+        reply:
+          type: string
+          example: "Iye bang, ada yang bisa dibantu?"
+
+    TranscribeResponse:
+      type: object
+      properties:
+        text:
+          type: string
+          example: "halo apa kabar"
+        language:
+          type: string
+          example: "id"
+        duration_seconds:
+          type: number
+          example: 2.5
+
+    VoiceChatResponse:
+      type: object
+      properties:
+        user_text:
+          type: string
+          example: "halo, apa itu sandbox?"
+        ai_text:
+          type: string
+          example: "Sandbox itu seperti ruang bermain terbatas..."
+        audio_base64:
+          type: string
+          description: >
+            Audio WAV terenkode base64. Bisa sangat besar (5-10MB).
+            Jangan log ke console. Gunakan langsung di new Audio(data:audio/wav;base64,...).
+          example: "UklGRiQ..."
+        mime_type:
+          type: string
+          example: "audio/wav"
+        conversation_id:
+          type: string
+          example: "0955b295-3d7a-44b3-9c24-c640d2f1bd34"
+
 paths:
   /characters:
     get:
@@ -13,6 +82,7 @@ paths:
       responses:
         '200':
           description: List of active characters
+
   /chat/betawi:
     post:
       summary: Chat with Abang Betawi
@@ -21,15 +91,21 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                message:
-                  type: string
-                conversation_id:
-                  type: string
+              $ref: '#/components/schemas/ChatRequest'
       responses:
         '200':
           description: AI response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatResponse'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /chat/rag:
     post:
       summary: Chat with Dokter Dokumen (RAG)
@@ -38,15 +114,21 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                message:
-                  type: string
-                conversation_id:
-                  type: string
+              $ref: '#/components/schemas/ChatRequest'
       responses:
         '200':
           description: AI response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatResponse'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /chat/git:
     post:
       summary: Chat with Git Master
@@ -55,15 +137,21 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                message:
-                  type: string
-                conversation_id:
-                  type: string
+              $ref: '#/components/schemas/ChatRequest'
       responses:
         '200':
           description: AI response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatResponse'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /chat/explain:
     post:
       summary: Chat with Profesor Analogi
@@ -72,15 +160,21 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                message:
-                  type: string
-                conversation_id:
-                  type: string
+              $ref: '#/components/schemas/ChatRequest'
       responses:
         '200':
           description: AI response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatResponse'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /document/upload:
     post:
       summary: Upload document for RAG chat
@@ -90,6 +184,7 @@ paths:
           multipart/form-data:
             schema:
               type: object
+              required: [file]
               properties:
                 file:
                   type: string
@@ -97,6 +192,13 @@ paths:
       responses:
         '200':
           description: Document uploaded and indexed
+        '400':
+          description: File tidak valid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /conversations:
     get:
       summary: List chat history sessions
@@ -106,9 +208,11 @@ paths:
           required: false
           schema:
             type: string
+            enum: [betawi, rag, git, explain]
       responses:
         '200':
           description: Array of conversation metadata
+
   /conversations/{id}:
     delete:
       summary: Delete a conversation session
@@ -121,6 +225,12 @@ paths:
       responses:
         '200':
           description: Session deleted
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
     patch:
       summary: Update conversation title
       parameters:
@@ -135,12 +245,20 @@ paths:
           application/json:
             schema:
               type: object
+              required: [title]
               properties:
                 title:
                   type: string
       responses:
         '200':
           description: Title updated
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /conversations/{id}/messages:
     get:
       summary: Fetch messages in a conversation
@@ -153,6 +271,7 @@ paths:
       responses:
         '200':
           description: List of messages
+
   /audio/transcribe:
     post:
       summary: Speech-to-Text Transcription
@@ -162,47 +281,122 @@ paths:
           multipart/form-data:
             schema:
               type: object
+              required: [file]
               properties:
                 file:
                   type: string
                   format: binary
+                  description: >
+                    File audio untuk ditranskripsi.
+                    Format yang direkomendasikan: audio/ogg;codecs=opus atau audio/wav.
+                    audio/webm (default MediaRecorder Chrome) belum terverifikasi didukung.
       responses:
         '200':
           description: Transcribed text
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TranscribeResponse'
+        '400':
+          description: File tidak ada atau kosong
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Transkripsi gagal
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /audio/synthesize:
     post:
       summary: Text-to-Speech Synthesis
+      description: >
+        Response berupa binary WAV, bukan JSON.
+        Gunakan response.blob() atau response.arrayBuffer() di FE,
+        bukan response.json().
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
+              required: [text]
               properties:
                 text:
                   type: string
+                  example: "Halo bang, apa kabar nih?"
                 voice_id:
                   type: string
+                  description: Nama suara Gemini TTS. Kosongkan untuk default (Kore).
+                  example: "Puck"
       responses:
         '200':
-          description: Audio file binary (audio/wav or audio/mp3)
+          description: Audio WAV binary — gunakan response.blob(), bukan response.json()
+          content:
+            audio/wav:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: Request tidak valid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Sintesis gagal
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /voice/chat:
     post:
       summary: End-to-End Voice Chat
+      description: >
+        Pipeline lengkap: rekaman suara → STT → AI per-karakter → TTS.
+        Latency normal 2-5 detik. Tambahkan loading state di UI.
+        History percakapan otomatis tersimpan dan bisa diakses via /conversations.
       requestBody:
         required: true
         content:
           multipart/form-data:
             schema:
               type: object
+              required: [file, character]
               properties:
                 file:
                   type: string
                   format: binary
+                  description: >
+                    Rekaman suara user. Format rekomendasi: audio/ogg;codecs=opus.
                 character:
                   type: string
+                  enum: [betawi, rag, git, explain]
+                  example: "betawi"
                 conversation_id:
                   type: string
+                  description: Kosongkan untuk memulai sesi baru.
+                  example: "0955b295-3d7a-44b3-9c24-c640d2f1bd34"
       responses:
         '200':
-          description: AI text and base64 audio response
+          description: Transkripsi user, balasan AI, dan audio base64
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VoiceChatResponse'
+        '400':
+          description: File tidak ada atau karakter tidak valid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Pipeline gagal (STT / AI / TTS error)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
