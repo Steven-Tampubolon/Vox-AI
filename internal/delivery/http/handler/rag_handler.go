@@ -17,6 +17,9 @@ import (
 	"github.com/ledongthuc/pdf"
 )
 
+// maxUploadSize batas ukuran file dokumen yang boleh diupload, untuk mencegah OOM.
+const maxUploadSize = 10 << 20 // 10 MB
+
 type RAGHandler struct {
 	useCase *usecase.RAGUseCase
 }
@@ -58,6 +61,9 @@ func (h *RAGHandler) UploadDocument(c *gin.Context) {
 		conversationID = uuid.New().String()
 	}
 
+	// Batasi ukuran body request agar file besar tidak menyebabkan OOM
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxUploadSize)
+
 	// ambil file dari multipart form
 	file, header, err := c.Request.FormFile("file")
 	if err != nil {
@@ -73,7 +79,9 @@ func (h *RAGHandler) UploadDocument(c *gin.Context) {
 	// Baca semua bytes SEKALI - dipakai untuk validasi dan ekstrak
 	rawBytes, err := io.ReadAll(file)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "gagal membaca file"})
+		c.JSON(http.StatusRequestEntityTooLarge, gin.H{
+			"error": fmt.Sprintf("file terlalu besar, maksimal %d MB", maxUploadSize/(1<<20)),
+		})
 		return
 	}
 
