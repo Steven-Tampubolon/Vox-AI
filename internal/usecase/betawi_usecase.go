@@ -142,7 +142,7 @@ func (uc *BetawiUseCase) ChatStream(ctx context.Context, req *domain.ChatRequest
 			CreatedAt:      time.Now(),
 		}
 		if saveErr := uc.chatRepo.SaveMessage(ctx, aiMsg); saveErr != nil {
-			return nil, fmt.Errorf("save ai message: %w", err)
+			return nil, fmt.Errorf("save ai message: %w", saveErr)
 		}
 	}
 
