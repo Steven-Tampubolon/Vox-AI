@@ -8,10 +8,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Steven-Tampubolon/Vox-AI/infrastructure/gemini"
 	"github.com/Steven-Tampubolon/Vox-AI/internal/domain"
 	"github.com/Steven-Tampubolon/Vox-AI/internal/repository"
 	"github.com/google/uuid"
+)
+
+const (
+	chunkMaxChars = 500 // ukuran maksimal karakter per chunk dokumen
+	topKChunks    = 3   // jumlah chunk paling relevan yang diambil per query
 )
 
 const ragSystemPrompt = `Kamu adalah Dokter Dokumen - asisten yang sangat teliti dalam membaca dan menganalisis dokumen.
@@ -80,7 +84,7 @@ func (uc *RAGUseCase) IndexDocument(ctx context.Context, conversationID, filenam
 	}
 
 	// 3. Potong dokumen jadi chunk
-	chunks := splitIntoChunks(content, 500)
+	chunks := splitIntoChunks(content, chunkMaxChars)
 
 	// 4. Buat metadata dokumen
 	doc := &domain.Document{
@@ -116,7 +120,7 @@ func (uc *RAGUseCase) IndexDocument(ctx context.Context, conversationID, filenam
 
 // Chat tanya jawab berdasarkan dokumen - versi non-stream
 func (uc *RAGUseCase) Chat(ctx context.Context, req *domain.ChatRequest) (*domain.ChatResponse, error) {
-	conv, err := uc.getOrCreateRAGConversation(ctx, req)
+	conv, err := getOrCreateConversation(ctx, req, domain.CharacterRAG, uc.chatRepo)
 	if err != nil {
 		return nil, fmt.Errorf("get or create conversation: %w", err)
 	}
@@ -138,8 +142,8 @@ func (uc *RAGUseCase) Chat(ctx context.Context, req *domain.ChatRequest) (*domai
 		return nil, err
 	}
 
-	// 5. Ambil history + kirim ke gemini
-	history, err := uc.buildRAGHistory(ctx, conv.ID)
+	// 3. Ambil history + kirim ke gemini
+	history, err := buildHistory(ctx, conv.ID, uc.chatRepo)
 	if err != nil {
 		return nil, fmt.Errorf("build history: %w", err)
 	}
@@ -149,7 +153,7 @@ func (uc *RAGUseCase) Chat(ctx context.Context, req *domain.ChatRequest) (*domai
 		return nil, fmt.Errorf("generate reply: %w", err)
 	}
 
-	// 6. Simpan jadi jawaban AI
+	// 4. Simpan jadi jawaban AI
 	aiMsg := &domain.Message{
 		ConversationID: conv.ID,
 		Role:           domain.RoleAssistant,
@@ -171,7 +175,7 @@ func (uc *RAGUseCase) Chat(ctx context.Context, req *domain.ChatRequest) (*domai
 // Retrieval (embed query + cari chunk relevan) tetap dilakukan blocking di awal -
 // baru setelah context dokumen siap, generation di-stream ke onChunk.
 func (uc *RAGUseCase) ChatStream(ctx context.Context, req *domain.ChatRequest, onChunk func(text string) error) (*domain.ChatResponse, error) {
-	conv, err := uc.getOrCreateRAGConversation(ctx, req)
+	conv, err := getOrCreateConversation(ctx, req, domain.CharacterRAG, uc.chatRepo)
 	if err != nil {
 		return nil, fmt.Errorf("get or create conversation: %w", err)
 	}
@@ -193,7 +197,7 @@ func (uc *RAGUseCase) ChatStream(ctx context.Context, req *domain.ChatRequest, o
 		return nil, err
 	}
 
-	history, err := uc.buildRAGHistory(ctx, conv.ID)
+	history, err := buildHistory(ctx, conv.ID, uc.chatRepo)
 	if err != nil {
 		return nil, fmt.Errorf("build history: %w", err)
 	}
@@ -247,7 +251,7 @@ func (uc *RAGUseCase) buildContextPrompt(ctx context.Context, conversationID, me
 		return "", fmt.Errorf("get chunks: %w", err)
 	}
 
-	relevanChunks := findTopK(allChunks, queryEmbedding, 3)
+	relevanChunks := findTopK(allChunks, queryEmbedding, topKChunks)
 
 	if len(relevanChunks) > 0 {
 		docContext := strings.Join(relevanChunks, "\n\n---\n\n")
@@ -323,60 +327,4 @@ func cosineSimilarity(a, b []float64) float64 {
 		return 0
 	}
 	return dot / (math.Sqrt(normA) * math.Sqrt(normB))
-}
-
-func (uc *RAGUseCase) getOrCreateRAGConversation(ctx context.Context, req *domain.ChatRequest) (*domain.Conversation, error) {
-	if req.ConversationID != "" {
-		conv, err := uc.chatRepo.GetConversation(ctx, req.ConversationID)
-		if err != nil {
-			return nil, err
-		}
-		if conv != nil {
-			// Validasi karakter - conversation harus milik karakter yang sama
-			if conv.Character != domain.CharacterRAG {
-				return nil, fmt.Errorf(
-					"conversation ini milik karakter %s, bukan rag", conv.Character,
-				)
-			}
-			return conv, nil
-		}
-	}
-
-	now := time.Now()
-	conv := &domain.Conversation{
-		ID:        uuid.New().String(),
-		Character: domain.CharacterRAG,
-		Title:     truncate(req.Message, 40),
-		CreatedAt: now,
-		UpdatedAt: now,
-	}
-	if err := uc.chatRepo.SaveConversation(ctx, conv); err != nil {
-		return nil, err
-	}
-	return conv, nil
-}
-
-func (uc *RAGUseCase) buildRAGHistory(ctx context.Context, coversationID string) ([]gemini.Content, error) {
-	messages, err := uc.chatRepo.GetMessages(ctx, coversationID)
-	if err != nil {
-		return nil, err
-	}
-
-	// Batasi 20 pesan terakhir
-	if len(messages) > 20 {
-		messages = messages[len(messages)-20:]
-	}
-
-	var history []gemini.Content
-	for _, msg := range messages {
-		role := "user"
-		if msg.Role == domain.RoleAssistant {
-			role = "model"
-		}
-		history = append(history, gemini.Content{
-			Role:  role,
-			Parts: []gemini.Part{{Text: msg.Content}},
-		})
-	}
-	return history, nil
 }

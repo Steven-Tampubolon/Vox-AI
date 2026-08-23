@@ -6,10 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Steven-Tampubolon/Vox-AI/infrastructure/gemini"
 	"github.com/Steven-Tampubolon/Vox-AI/internal/domain"
 	"github.com/Steven-Tampubolon/Vox-AI/internal/repository"
-	"github.com/google/uuid"
 )
 
 const explainSystemPrompt = `Kamu adalah Profesor Analogi - ahli menjelaskan konsep dengan cara yang mudah dipahami siapa saja.
@@ -64,7 +62,7 @@ func NewExplainUseCase(
 
 // Chat - versi non-stream
 func (uc *ExplainUseCase) Chat(ctx context.Context, req *domain.ChatRequest) (*domain.ChatResponse, error) {
-	conv, err := uc.getOrCreateExplainConversation(ctx, req)
+	conv, err := getOrCreateConversation(ctx, req, domain.CharacterExplain, uc.chatRepo)
 	if err != nil {
 		return nil, fmt.Errorf("get or create conversation: %w", err)
 	}
@@ -79,7 +77,7 @@ func (uc *ExplainUseCase) Chat(ctx context.Context, req *domain.ChatRequest) (*d
 		return nil, fmt.Errorf("save user message: %w", err)
 	}
 
-	history, err := uc.buildExplainHistory(ctx, conv.ID)
+	history, err := buildHistory(ctx, conv.ID, uc.chatRepo)
 	if err != nil {
 		return nil, fmt.Errorf("build history: %w", err)
 	}
@@ -110,7 +108,7 @@ func (uc *ExplainUseCase) Chat(ctx context.Context, req *domain.ChatRequest) (*d
 // onChunk dipanggil setiap ada potongan teks baru dari Gemini, supaya handler
 // bisa langsung menulis ke http.ResponseWriter tanpa menunggu jawaban selesai.
 func (uc *ExplainUseCase) ChatStream(ctx context.Context, req *domain.ChatRequest, onChunk func(text string) error) (*domain.ChatResponse, error) {
-	conv, err := uc.getOrCreateExplainConversation(ctx, req)
+	conv, err := getOrCreateConversation(ctx, req, domain.CharacterExplain, uc.chatRepo)
 	if err != nil {
 		return nil, fmt.Errorf("get or create conversation: %w", err)
 	}
@@ -125,7 +123,7 @@ func (uc *ExplainUseCase) ChatStream(ctx context.Context, req *domain.ChatReques
 		return nil, fmt.Errorf("save user message: %w", err)
 	}
 
-	history, err := uc.buildExplainHistory(ctx, conv.ID)
+	history, err := buildHistory(ctx, conv.ID, uc.chatRepo)
 	if err != nil {
 		return nil, fmt.Errorf("build history: %w", err)
 	}
@@ -165,60 +163,4 @@ func (uc *ExplainUseCase) ChatStream(ctx context.Context, req *domain.ChatReques
 		Character:      domain.CharacterExplain,
 		Reply:          reply,
 	}, nil
-}
-
-func (uc *ExplainUseCase) getOrCreateExplainConversation(ctx context.Context, req *domain.ChatRequest) (*domain.Conversation, error) {
-	if req.ConversationID != "" {
-		conv, err := uc.chatRepo.GetConversation(ctx, req.ConversationID)
-		if err != nil {
-			return nil, err
-		}
-		if conv != nil {
-			// Validasi karakter - conversation harus milik karakter yang sama
-			if conv.Character != domain.CharacterExplain {
-				return nil, fmt.Errorf(
-					"conversation ini milik karakter %s, bukan explain", conv.Character,
-				)
-			}
-			return conv, nil
-		}
-	}
-
-	now := time.Now()
-	conv := &domain.Conversation{
-		ID:        uuid.New().String(),
-		Character: domain.CharacterExplain,
-		Title:     truncate(req.Message, 40),
-		CreatedAt: now,
-		UpdatedAt: now,
-	}
-	if err := uc.chatRepo.SaveConversation(ctx, conv); err != nil {
-		return nil, err
-	}
-	return conv, nil
-}
-
-func (uc *ExplainUseCase) buildExplainHistory(ctx context.Context, conversationID string) ([]gemini.Content, error) {
-	messages, err := uc.chatRepo.GetMessages(ctx, conversationID)
-	if err != nil {
-		return nil, err
-	}
-
-	// Batasi 20 pesan terakhir
-	if len(messages) > 20 {
-		messages = messages[len(messages)-20:]
-	}
-
-	var history []gemini.Content
-	for _, msg := range messages {
-		role := "user"
-		if msg.Role == domain.RoleAssistant {
-			role = "model"
-		}
-		history = append(history, gemini.Content{
-			Role:  role,
-			Parts: []gemini.Part{{Text: msg.Content}},
-		})
-	}
-	return history, nil
 }
