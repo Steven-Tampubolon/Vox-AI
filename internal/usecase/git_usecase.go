@@ -164,7 +164,7 @@ func (uc *GitUseCase) ChatStream(ctx context.Context, req *domain.ChatRequest, o
 	}
 
 	if streamErr != nil {
-		return nil, fmt.Errorf("generate stream eply: %w", err)
+		return nil, fmt.Errorf("generate stream reply: %w", streamErr)
 	}
 
 	if reply == "" {
@@ -173,7 +173,7 @@ func (uc *GitUseCase) ChatStream(ctx context.Context, req *domain.ChatRequest, o
 
 	return &domain.ChatResponse{
 		ConversationID: conv.ID,
-		Character:      domain.CharacterExplain,
+		Character:      domain.CharacterGit,
 		Reply:          reply,
 	}, nil
 }
