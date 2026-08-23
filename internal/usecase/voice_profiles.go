@@ -7,7 +7,7 @@ type VoiceProfile struct {
 	AudioProfile string
 }
 
-var chatracterVoiceProfiles = map[domain.Character]VoiceProfile{
+var characterVoiceProfiles = map[domain.Character]VoiceProfile{
 	domain.CharacterBetawi: {
 		VoiceID: "Puck",
 		AudioProfile: `Read the following transcript based on the audio profile and director's note.
