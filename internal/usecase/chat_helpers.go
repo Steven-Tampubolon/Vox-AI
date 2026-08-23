@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Steven-Tampubolon/Vox-AI/infrastructure/gemini"
 	"github.com/Steven-Tampubolon/Vox-AI/internal/domain"
 	"github.com/Steven-Tampubolon/Vox-AI/internal/repository"
 	"github.com/google/uuid"
@@ -68,7 +67,7 @@ func buildHistory(
 	ctx context.Context,
 	conversationID string,
 	chatRepo repository.ChatRepository,
-) ([]gemini.Content, error) {
+) ([]repository.ChatMessage, error) {
 	messages, err := chatRepo.GetMessages(ctx, conversationID)
 	if err != nil {
 		return nil, err
@@ -79,15 +78,15 @@ func buildHistory(
 		messages = messages[len(messages)-maxHistoryMessages:]
 	}
 
-	var history []gemini.Content
+	var history []repository.ChatMessage
 	for _, msg := range messages {
 		role := "user"
 		if msg.Role == domain.RoleAssistant {
 			role = "model"
 		}
-		history = append(history, gemini.Content{
-			Role:  role,
-			Parts: []gemini.Part{{Text: msg.Content}},
+		history = append(history, repository.ChatMessage{
+			Role:    role,
+			Content: msg.Content,
 		})
 	}
 	return history, nil
