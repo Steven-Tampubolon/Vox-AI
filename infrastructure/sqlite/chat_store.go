@@ -37,7 +37,8 @@ func (s *ChatStore) Migrate() error {
 		content         TEXT NOT NULL,
 		created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
 		FOREIGN KEY (conversation_id) REFERENCES conversations(id)
-	);`
+	);
+	CREATE INDEX IF NOT EXISTS idx_messages_conversation_id ON messages(conversation_id);`
 
 	_, err := s.db.Exec(query)
 	return err

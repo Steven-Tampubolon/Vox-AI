@@ -34,7 +34,8 @@ func (s *DocumentStore) Migrate() error {
 		content     TEXT NOT NULL,
 		embedding   TEXT NOT NULL,
 		FOREIGN KEY (document_id) REFERENCES documents(id)
-	);`
+	);
+	CREATE INDEX IF NOT EXISTS idx_chunks_document_id ON chunks(document_id);`
 
 	_, err := s.db.Exec(query)
 	return err
