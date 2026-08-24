@@ -129,7 +129,7 @@ func (h *RAGHandler) UploadDocument(c *gin.Context) {
 		textContent,
 	)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondInternalError(c, "rag.IndexDocument", err)
 		return
 	}
 

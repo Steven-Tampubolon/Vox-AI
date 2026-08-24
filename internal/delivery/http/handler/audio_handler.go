@@ -48,7 +48,7 @@ func (h *AudioHandler) Transcribe(c *gin.Context) {
 		MimeType: fileHeader.Header.Get("Content-Type"),
 	})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondInternalError(c, "audio.Transcribe", err)
 		return
 	}
 
@@ -75,7 +75,7 @@ func (h *AudioHandler) Synthesize(c *gin.Context) {
 			return
 		}
 
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondInternalError(c, "audio.Synthesize", err)
 		return
 	}
 
@@ -114,7 +114,7 @@ func (h *AudioHandler) VoiceChat(c *gin.Context) {
 		MimeType: fileHeader.Header.Get("Content-Type"),
 	})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondInternalError(c, "audio.VoiceChat", err)
 		return
 	}
 
