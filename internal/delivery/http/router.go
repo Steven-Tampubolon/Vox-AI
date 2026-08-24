@@ -1,6 +1,7 @@
 package http
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
@@ -23,6 +24,10 @@ func NewRouter(
 ) *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
+
+	if err := router.SetTrustedProxies(nil); err != nil {
+		panic(fmt.Sprintf("gagal set trusted proxies: %v", err))
+	}
 
 	// ── Global middleware ──────────────────────────────────
 	router.Use(middleware.Logger())
