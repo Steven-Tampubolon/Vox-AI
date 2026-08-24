@@ -33,7 +33,7 @@ func (h *ConversationHandler) List(c *gin.Context) {
 
 	convs, err := h.chatRepo.ListConversationsByCharacter(c.Request.Context(), character)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondInternalError(c, "conversation.List", err)
 		return
 	}
 
@@ -57,7 +57,7 @@ func (h *ConversationHandler) GetMessages(c *gin.Context) {
 	// Pastikan conversation ada
 	conv, err := h.chatRepo.GetConversation(c.Request.Context(), id)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondInternalError(c, "conversation.GetMessages", err)
 		return
 	}
 	if conv == nil {
@@ -86,7 +86,7 @@ func (h *ConversationHandler) GetMessages(c *gin.Context) {
 
 	msgs, err := h.chatRepo.GetMessages(c.Request.Context(), id)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondInternalError(c, "conversation.GetMessages", err)
 		return
 	}
 
@@ -112,7 +112,7 @@ func (h *ConversationHandler) Delete(c *gin.Context) {
 	// Pastikan conversation ada sebelum di hapus
 	conv, err := h.chatRepo.GetConversation(c.Request.Context(), id)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		respondInternalError(c, "conversation.Delete", err)
 		return
 	}
 	if conv == nil {
@@ -121,7 +121,7 @@ func (h *ConversationHandler) Delete(c *gin.Context) {
 	}
 
 	if err := h.chatRepo.DeleteConversation(c.Request.Context(), id); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondInternalError(c, "conversation.Delete", err)
 		return
 	}
 
@@ -155,7 +155,7 @@ func (h *ConversationHandler) UpdateTitle(c *gin.Context) {
 	// Pastikan conversation ada
 	conv, err := h.chatRepo.GetConversation(c.Request.Context(), id)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondInternalError(c, "conversation.UpdateTitle", err)
 		return
 	}
 
@@ -165,7 +165,7 @@ func (h *ConversationHandler) UpdateTitle(c *gin.Context) {
 	}
 
 	if err := h.chatRepo.UpdateConversationTitle(c.Request.Context(), id, body.Title); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondInternalError(c, "conversation.UpdateTitle", err)
 		return
 	}
 

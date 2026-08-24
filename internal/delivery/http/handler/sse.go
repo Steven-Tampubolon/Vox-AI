@@ -72,7 +72,7 @@ func streamChat(c *gin.Context, fn chatStreamFunc) {
 
 		// error asli: Gemini overload, DB gagal simpan, dsb
 		log.Printf("stream error: %v", err)
-		_ = writeSSE(c, gin.H{"error": err.Error()})
+		_ = writeSSE(c, gin.H{"error": "terjadi kesalahan pada server, coba lagi nanti"})
 	}
 
 	writeSSEDone(c)
