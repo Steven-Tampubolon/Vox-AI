@@ -6,6 +6,7 @@ import (
 	"math"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Steven-Tampubolon/Vox-AI/internal/domain"
@@ -14,8 +15,9 @@ import (
 )
 
 const (
-	chunkMaxChars = 500 // ukuran maksimal karakter per chunk dokumen
-	topKChunks    = 3   // jumlah chunk paling relevan yang diambil per query
+	chunkMaxChars       = 500 // ukuran maksimal karakter per chunk dokumen
+	topKChunks          = 3   // jumlah chunk paling relevan yang diambil per query
+	maxConcurrentEmbeds = 5   // batas gorroutine embed yang jalan bersamaan ke Gemini
 )
 
 const ragSystemPrompt = `Kamu adalah Dokter Dokumen - asisten yang sangat teliti dalam membaca dan menganalisis dokumen.
@@ -98,17 +100,16 @@ func (uc *RAGUseCase) IndexDocument(ctx context.Context, conversationID, filenam
 		return nil, fmt.Errorf("save document: %w", err)
 	}
 
-	// 5.Embed setiap chunk dan simpan
-	for _, chunkText := range chunks {
-		embedding, err := uc.aiRepo.Embed(ctx, chunkText)
-		if err != nil {
-			return nil, fmt.Errorf("embed chunk: %w", err)
-		}
-
+	// 5. Embed semua chunk secara konkuren (dibatasi maxConcurrentEmbeds), lalu simpan berurutan sesuai urutan chunk asli.
+	embeddings, err := uc.embedChunksConcurrently(ctx, chunks)
+	if err != nil {
+		return nil, fmt.Errorf("embed chunk: %w", err)
+	}
+	for i, chunkText := range chunks {
 		chunk := &domain.Chunk{
 			DocumentID: doc.ID,
 			Content:    chunkText,
-			Embedding:  embedding,
+			Embedding:  embeddings[i],
 		}
 		if err := uc.docRepo.SaveChunk(ctx, chunk); err != nil {
 			return nil, fmt.Errorf("save chunk: %w", err)
@@ -116,6 +117,50 @@ func (uc *RAGUseCase) IndexDocument(ctx context.Context, conversationID, filenam
 	}
 
 	return doc, nil
+}
+
+// embedChunksConcurrently menjalankan uc.aiRepo.Embed untuk setiap chunk secara konkuren
+func (uc *RAGUseCase) embedChunksConcurrently(ctx context.Context, chunks []string) ([][]float64, error) {
+	embeddings := make([][]float64, len(chunks))
+
+	childCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	sem := make(chan struct{}, maxConcurrentEmbeds)
+	var wg sync.WaitGroup
+	var once sync.Once
+	var firstErr error
+
+	for i, chunkText := range chunks {
+		i, chunkText := i, chunkText // hindari capture loop variable
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+
+			select {
+			case sem <- struct{}{}:
+				defer func() { <-sem }()
+			case <-childCtx.Done():
+				return
+			}
+
+			embedding, err := uc.aiRepo.Embed(childCtx, chunkText)
+			if err != nil {
+				once.Do(func() {
+					firstErr = err
+					cancel()
+				})
+				return
+			}
+			embeddings[i] = embedding
+		}()
+	}
+
+	wg.Wait()
+	if firstErr != nil {
+		return nil, firstErr
+	}
+	return embeddings, nil
 }
 
 // Chat tanya jawab berdasarkan dokumen - versi non-stream
