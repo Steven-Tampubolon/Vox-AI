@@ -55,7 +55,7 @@ func (u *AudioUsecase) VoiceChat(ctx context.Context, character string, convID s
 		return nil, fmt.Errorf("karakter '%s' belum didukung untuk voice chat", character)
 	}
 
-	profile, ok := chatracterVoiceProfiles[char]
+	profile, ok := characterVoiceProfiles[char]
 	if !ok {
 		profile = VoiceProfile{
 			VoiceID:      "Kore",

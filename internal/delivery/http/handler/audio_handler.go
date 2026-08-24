@@ -102,7 +102,11 @@ func (h *AudioHandler) VoiceChat(c *gin.Context) {
 
 	}()
 
-	data, _ := io.ReadAll(file)
+	data, err := io.ReadAll(file)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "unable to read file data"})
+		return
+	}
 
 	res, err := h.audioUC.VoiceChat(c.Request.Context(), character, convID, domain.AudioRequest{
 		Data:     data,
