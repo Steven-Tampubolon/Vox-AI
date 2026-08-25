@@ -34,7 +34,7 @@ func (m *mockCharacterChat) Chat(ctx context.Context, req *domain.ChatRequest) (
 }
 
 func TestTranscribeAudio(t *testing.T) {
-	uc := usecase.NewAudioUsecase(&mockTranscriber{}, &mockSynthesizer{}, nil)
+	uc := usecase.NewAudioUseCase(&mockTranscriber{}, &mockSynthesizer{}, nil)
 	res, err := uc.Transcribe(context.Background(), domain.AudioRequest{Data: []byte("test")})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
@@ -46,7 +46,7 @@ func TestTranscribeAudio(t *testing.T) {
 
 func TestVoiceChat(t *testing.T) {
 	betawi := &mockCharacterChat{}
-	uc := usecase.NewAudioUsecase(&mockTranscriber{}, &mockSynthesizer{}, map[domain.Character]usecase.CharacterChatUsecase{
+	uc := usecase.NewAudioUseCase(&mockTranscriber{}, &mockSynthesizer{}, map[domain.Character]usecase.CharacterChatUseCase{
 		domain.CharacterBetawi: betawi,
 	})
 
@@ -69,7 +69,7 @@ func TestVoiceChat(t *testing.T) {
 }
 
 func TestVoiceChat_UnknownCharacter(t *testing.T) {
-	uc := usecase.NewAudioUsecase(&mockTranscriber{}, &mockSynthesizer{}, map[domain.Character]usecase.CharacterChatUsecase{})
+	uc := usecase.NewAudioUseCase(&mockTranscriber{}, &mockSynthesizer{}, map[domain.Character]usecase.CharacterChatUseCase{})
 	_, err := uc.VoiceChat(context.Background(), "ngasal", "", domain.AudioRequest{Data: []byte("test")})
 	if err == nil {
 		t.Fatalf("expected error untuk karakter yang tidak valid, nil")

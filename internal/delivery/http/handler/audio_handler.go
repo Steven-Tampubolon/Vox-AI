@@ -12,10 +12,10 @@ import (
 )
 
 type AudioHandler struct {
-	audioUC *usecase.AudioUsecase
+	audioUC *usecase.AudioUseCase
 }
 
-func NewAudioHandler(audioUC *usecase.AudioUsecase) *AudioHandler {
+func NewAudioHandler(audioUC *usecase.AudioUseCase) *AudioHandler {
 	return &AudioHandler{audioUC: audioUC}
 }
 

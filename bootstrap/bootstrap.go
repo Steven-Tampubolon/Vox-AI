@@ -80,13 +80,13 @@ func AppInit() {
 
 	audioTranscriber := audiogemini.NewTranscriber(cfg.GeminiAPIKey)
 	audioSynthesizer := audiogemini.NewSynthesizer(cfg.GeminiAPIKey)
-	characterChatMap := map[domain.Character]usecase.CharacterChatUsecase{
+	characterChatMap := map[domain.Character]usecase.CharacterChatUseCase{
 		domain.CharacterBetawi:  betawiUC,
 		domain.CharacterRAG:     ragUC,
 		domain.CharacterGit:     gitUC,
 		domain.CharacterExplain: explainUC,
 	}
-	audioUC := usecase.NewAudioUsecase(audioTranscriber, audioSynthesizer, characterChatMap)
+	audioUC := usecase.NewAudioUseCase(audioTranscriber, audioSynthesizer, characterChatMap)
 
 	// 6. Buat handlers
 	betawiH := handler.NewBetawiHandler(betawiUC)

@@ -10,22 +10,22 @@ import (
 )
 
 // CharacterUseCase adalah kontrak minimal yang sudah dipenuhi usecase dari tiap karakter
-type CharacterChatUsecase interface {
+type CharacterChatUseCase interface {
 	Chat(ctx context.Context, req *domain.ChatRequest) (*domain.ChatResponse, error)
 }
 
-type AudioUsecase struct {
+type AudioUseCase struct {
 	transcriber repository.AudioTranscriber
 	synthesizer repository.AudioSynthesizer
-	character   map[domain.Character]CharacterChatUsecase
+	character   map[domain.Character]CharacterChatUseCase
 }
 
-func NewAudioUsecase(
+func NewAudioUseCase(
 	transcriber repository.AudioTranscriber,
 	synthesizer repository.AudioSynthesizer,
-	character map[domain.Character]CharacterChatUsecase,
-) *AudioUsecase {
-	return &AudioUsecase{
+	character map[domain.Character]CharacterChatUseCase,
+) *AudioUseCase {
+	return &AudioUseCase{
 		transcriber: transcriber,
 		synthesizer: synthesizer,
 		character:   character,
@@ -33,18 +33,18 @@ func NewAudioUsecase(
 }
 
 // TranscribeAudio - dipakai handler POST /api/v1/audio/transcribe (STT murni)
-func (u *AudioUsecase) Transcribe(ctx context.Context, req domain.AudioRequest) (*domain.TranscribeResult, error) {
+func (u *AudioUseCase) Transcribe(ctx context.Context, req domain.AudioRequest) (*domain.TranscribeResult, error) {
 	return u.transcriber.Transcribe(ctx, req)
 }
 
 // SynthesizeText - dipakai handler POST /api/v1/audio/synthesize (TTS murni)
-func (u *AudioUsecase) SynthesizeText(ctx context.Context, req domain.SynthesizeRequest) (*domain.SynthesizeResult, error) {
+func (u *AudioUseCase) SynthesizeText(ctx context.Context, req domain.SynthesizeRequest) (*domain.SynthesizeResult, error) {
 	return u.synthesizer.Synthesize(ctx, req)
 }
 
 // VoiceChat - dipakai handler POST /api/v1/voice/chat.
 // Pipeline: STT -> AI per-karakter (history + persistence) -> TTS
-func (u *AudioUsecase) VoiceChat(ctx context.Context, character string, convID string, req domain.AudioRequest) (*domain.VoiceChatResult, error) {
+func (u *AudioUseCase) VoiceChat(ctx context.Context, character string, convID string, req domain.AudioRequest) (*domain.VoiceChatResult, error) {
 	char := domain.Character(character)
 	if !char.IsValid() {
 		return nil, fmt.Errorf("karakter '%s' tidak dikenal, gunakan salah satu dari: betawi, rag, git, explain", character)
