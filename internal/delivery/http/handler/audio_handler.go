@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -20,8 +21,19 @@ func NewAudioHandler(audioUC *usecase.AudioUseCase) *AudioHandler {
 }
 
 func (h *AudioHandler) Transcribe(c *gin.Context) {
+	// Batasi ukuran body request agar file audio besar tidak menyebabkan OOM
+	// (konsisten dengan maxUploadSize di rag_handler.go)
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxUploadSize)
+
 	fileHeader, err := c.FormFile("file")
 	if err != nil {
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			c.JSON(http.StatusRequestEntityTooLarge, gin.H{
+				"error": fmt.Sprintf("file audio terlalu besar, maksimal %d MB", maxUploadSize/(1<<20)),
+			})
+			return
+		}
 		c.JSON(http.StatusBadRequest, gin.H{"error": "file field required"})
 		return
 	}
@@ -38,7 +50,9 @@ func (h *AudioHandler) Transcribe(c *gin.Context) {
 
 	data, err := io.ReadAll(file)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "unable to read file data"})
+		c.JSON(http.StatusRequestEntityTooLarge, gin.H{
+			"error": fmt.Sprintf("file audio terlalu besar, maksimal %d MB", maxUploadSize/(1<<20)),
+		})
 		return
 	}
 
@@ -83,11 +97,21 @@ func (h *AudioHandler) Synthesize(c *gin.Context) {
 }
 
 func (h *AudioHandler) VoiceChat(c *gin.Context) {
+	// Batasi ukuran body request agar file audio besar tidak menyebabkan OOM
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxUploadSize)
+
 	character := c.PostForm("character")
 	convID := c.PostForm("conversation_id")
 
 	fileHeader, err := c.FormFile("file")
 	if err != nil {
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			c.JSON(http.StatusRequestEntityTooLarge, gin.H{
+				"error": fmt.Sprintf("file audio terlalu besar, maksimal %d MB", maxUploadSize/(1<<20)),
+			})
+			return
+		}
 		c.JSON(http.StatusBadRequest, gin.H{"error": "file field required"})
 		return
 	}
@@ -104,7 +128,9 @@ func (h *AudioHandler) VoiceChat(c *gin.Context) {
 
 	data, err := io.ReadAll(file)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "unable to read file data"})
+		c.JSON(http.StatusRequestEntityTooLarge, gin.H{
+			"error": fmt.Sprintf("file audio terlalu besar, maksimal %d MB", maxUploadSize/(1<<20)),
+		})
 		return
 	}
 
