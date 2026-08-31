@@ -1,6 +1,7 @@
 package bootstrap
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"log"
@@ -15,7 +16,15 @@ import (
 	"github.com/Steven-Tampubolon/Vox-AI/internal/domain"
 	"github.com/Steven-Tampubolon/Vox-AI/internal/repository"
 	"github.com/Steven-Tampubolon/Vox-AI/internal/usecase"
+	moderncsqlite "modernc.org/sqlite"
 )
+
+func init() {
+	moderncsqlite.RegisterConnectionHook(func(conn moderncsqlite.ExecQuerierContext, dsn string) error {
+		_, err := conn.ExecContext(context.Background(), "PRAGMA foreign_keys = ON;", nil)
+		return err
+	})
+}
 
 func closeDB(db *sql.DB) {
 	if err := db.Close(); err != nil {
