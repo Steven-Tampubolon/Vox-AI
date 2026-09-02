@@ -9,6 +9,7 @@ import (
 
 type Config struct {
 	GeminiAPIKey string
+	AppAPIKey    string
 	Port         string
 	DBPath       string
 	AllowOrigin  string
@@ -21,6 +22,7 @@ func Load() *Config {
 
 	return &Config{
 		GeminiAPIKey: getEnv("GEMINI_API_KEY", ""),
+		AppAPIKey:    getEnv("APP_API_KEY", ""),
 		Port:         getEnv("PORT", "8080"),
 		DBPath:       getEnv("DB_PATH", "./voxai.db"),
 		AllowOrigin:  getEnv("ALLOW_ORIGINS", "http://localhost:3000"),

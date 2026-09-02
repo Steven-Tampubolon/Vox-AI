@@ -55,6 +55,9 @@ func AppInit() {
 	if cfg.GeminiAPIKey == "" {
 		log.Fatal("GEMINI_API_KEY tidak ditemukan di .env")
 	}
+	if cfg.AppAPIKey == "" {
+		log.Fatal("APP_API_KEY tidak ditemukan di .env - server tidak bisa dijalankan tanpa API Key autentikasi")
+	}
 
 	// 2. Buka koneksi ke database
 	db, err := connectDB(cfg.DBPath)
@@ -111,6 +114,7 @@ func AppInit() {
 		betawiH, ragH, gitH, explainH, convH,
 		characterH, audioH,
 		cfg.AllowOrigin,
+		cfg.AppAPIKey,
 	)
 
 	cli.PrintSystemInfo(cfg)

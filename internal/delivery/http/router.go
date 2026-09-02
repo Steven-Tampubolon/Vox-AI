@@ -21,6 +21,7 @@ func NewRouter(
 	character *handler.CharacterHandler,
 	audio *handler.AudioHandler,
 	allowOrigin string,
+	apiKey string,
 ) *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
@@ -50,6 +51,7 @@ func NewRouter(
 
 	// ── API v1 ─────────────────────────────────────────────
 	api := router.Group("/api/v1")
+	api.Use(middleware.APIKeyAuth(apiKey))
 	{
 		// Character - list 4 karakter + metadata
 		api.GET("/characters", character.List)
