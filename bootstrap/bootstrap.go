@@ -102,7 +102,7 @@ func AppInit() {
 	ragH := handler.NewRAGHandler(ragUC)
 	gitH := handler.NewGitHandler(gitUC)
 	explainH := handler.NewExplainHandler(explainUC)
-	convH := handler.NewConversationHandler(chatRepo)
+	convH := handler.NewConversationHandler(chatRepo, docRepo)
 	characterH := handler.NewCharacterHandler()
 	audioH := handler.NewAudioHandler(audioUC)
 
