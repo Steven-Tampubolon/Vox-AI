@@ -28,7 +28,7 @@ func openTestDB(t *testing.T) *sql.DB {
 	if err != nil {
 		t.Fatalf("gagal buka db: %v", err)
 	}
-	t.Cleanup(func() { db.Close() })
+	t.Cleanup(func() { _ = db.Close() })
 
 	if err := sqlite.NewChatStore(db).Migrate(); err != nil {
 		t.Fatalf("migrasi chat gagal: %v", err)

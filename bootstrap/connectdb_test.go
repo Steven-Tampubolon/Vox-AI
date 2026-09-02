@@ -20,7 +20,7 @@ func TestConnectDB_EnforcesForeignKeys(t *testing.T) {
 	if err != nil {
 		t.Fatalf("connectDB gagal: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	store := sqlite.NewChatStore(db)
 	if err := store.Migrate(); err != nil {
@@ -47,7 +47,7 @@ func TestConnectDB_AllowsValidForeignKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("connectDB gagal: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	store := sqlite.NewChatStore(db)
 	if err := store.Migrate(); err != nil {
@@ -85,7 +85,7 @@ func TestConnectDB_ForeignKeyAppliesAcrossPooledConnections(t *testing.T) {
 	if err != nil {
 		t.Fatalf("connectDB gagal: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	db.SetMaxOpenConns(5) // paksa pool boleh buka sampai 5 koneksi fisik
 
