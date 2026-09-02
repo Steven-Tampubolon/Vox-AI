@@ -18,7 +18,9 @@ import (
 )
 
 // maxUploadSize batas ukuran file dokumen yang boleh diupload, untuk mencegah OOM.
-const maxUploadSize = 10 << 20 // 10 MB
+const maxUploadSize = 10 << 20    // 10 MB
+const maxPDFPages = 50            // max 50 lembar
+const maxExtractedChars = 100_000 // batas jumlah karakter
 
 type RAGHandler struct {
 	useCase *usecase.RAGUseCase
@@ -104,7 +106,8 @@ func (h *RAGHandler) UploadDocument(c *gin.Context) {
 	if strings.HasPrefix(mimeType, "application/pdf") {
 		textContent, err = extractPDFText(rawBytes)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("gagal ekstrak teks dari PDF: %s", err.Error())})
+			log.Printf("[rag.UploadDocument] PDF extraction error: %v", err)
+			c.JSON(http.StatusBadRequest, gin.H{"error": "gagal memproses file PDF, pastikan file tidak corrupt dan tidak terproteksi password"})
 			return
 		}
 	} else {
@@ -183,12 +186,19 @@ func extractPDFText(data []byte) (string, error) {
 		return "", fmt.Errorf("gagal membuka PDF: %w", err)
 	}
 
-	var result strings.Builder
 	numPages := r.NumPage()
 
 	if numPages == 0 {
 		return "", fmt.Errorf("PDF tidak memiliki halaman")
 	}
+	if numPages > maxPDFPages {
+		return "", fmt.Errorf(
+			"PDF terlalu panjang: %d halaman terdeteksi, maksimal %d halaman yang diizinkan",
+			numPages, maxPDFPages,
+		)
+	}
+
+	var result strings.Builder
 
 	for i := 1; i <= numPages; i++ {
 		page := r.Page(i)
@@ -204,6 +214,12 @@ func extractPDFText(data []byte) (string, error) {
 
 		result.WriteString(text)
 		result.WriteString("\n\n")
+
+		if result.Len() >= maxExtractedChars {
+			log.Printf("[rag.extractPDFText] batas karakter tercapai di dalam halaman %d/%d (%d chars), ekstraksi dihentikan",
+				i, numPages, result.Len())
+			break
+		}
 	}
 
 	return result.String(), nil
