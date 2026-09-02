@@ -10,10 +10,11 @@ import (
 
 type ConversationHandler struct {
 	chatRepo repository.ChatRepository
+	docRepo  repository.DocumentRepository
 }
 
-func NewConversationHandler(chatRepo repository.ChatRepository) *ConversationHandler {
-	return &ConversationHandler{chatRepo: chatRepo}
+func NewConversationHandler(chatRepo repository.ChatRepository, docRepo repository.DocumentRepository) *ConversationHandler {
+	return &ConversationHandler{chatRepo: chatRepo, docRepo: docRepo}
 }
 
 // List semua sesi chat - support filter ?character=betawi
@@ -117,6 +118,12 @@ func (h *ConversationHandler) Delete(c *gin.Context) {
 	}
 	if conv == nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "conversation tidak ditemukan"})
+		return
+	}
+
+	// hapus dokumen + chunks sebelum FK aktif
+	if err := h.docRepo.DeleteByConversation(c.Request.Context(), id); err != nil {
+		respondInternalError(c, "conversation.Delete", err)
 		return
 	}
 
