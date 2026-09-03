@@ -31,7 +31,7 @@ func CORS(allowOriginsRaw string) gin.HandlerFunc {
 
 		// Tambahkan header pendukung lainnya
 		c.Header("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS, PUT, PATCH")
-		c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization, Origin, Accept")
+		c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization, Origin, Accept, X-API-Key")
 		c.Header("Access-Control-Allow-Credentials", "true")
 
 		// Handle Preflight Request (OPTIONS)
