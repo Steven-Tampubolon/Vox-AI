@@ -23,7 +23,7 @@ services:
     image: ghcr.io/steven-tampubolon/vox-ai-frontend:latest
     container_name: voxai-frontend
     ports:
-      - "3000:80"
+      - "3000:8080"
     environment:
       API_KEY: ${APP_API_KEY}
     depends_on:
