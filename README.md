@@ -111,7 +111,6 @@ nano .env
 `.env`:
 ```env
 GEMINI_API_KEY=isi_dengan_api_key_anda
-APP_API_KEY=isi_dengan_secret_key_anda
 PORT=8080
 DB_PATH=./voxai.db
 ALLOW_ORIGINS=http://localhost:3000
